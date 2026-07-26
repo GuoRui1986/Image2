@@ -37,7 +37,7 @@ function route() {
   const loggedIn = !!state.token;
   $('#app-header').style.display = loggedIn ? 'flex' : 'none';
   $('#view-login').style.display = (!loggedIn && h === '#/login') ? 'block' : 'none';
-  $('#view-user').style.display = (loggedIn && (h === '#/user' || h === '#/admin')) ? 'block' : 'none';
+  $('#view-user').style.display = (loggedIn && h === '#/user') ? 'block' : 'none';
   $('#view-admin').style.display = (loggedIn && h === '#/admin') ? 'block' : 'none';
 
   if (loggedIn && state.user) {
