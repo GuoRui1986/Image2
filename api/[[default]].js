@@ -1,15 +1,15 @@
 // IGA Pages Functions 入口（Node.js 运行时）
 // 约定：api/[[default]].js 作为 catch-all，export default app，平台接管监听，勿调 app.listen()
 import express from 'express';
-import { checkDbConfig } from './db.js';
-import { login, me, authRequired, adminRequired, seedAdmin } from './auth.js';
-import { generate } from './generate.js';
-import { statusQuery } from './status.js';
-import { uploadRefHandler } from './storage.js';
+import { checkDbConfig } from '../server/db.js';
+import { login, me, authRequired, adminRequired, seedAdmin } from '../server/auth.js';
+import { generate } from '../server/generate.js';
+import { statusQuery } from '../server/status.js';
+import { uploadRefHandler } from '../server/storage.js';
 import {
   listUsers, createUser, updateUser, deleteUser,
   listPricing, updatePricing, listGenLogs, listOpLogs,
-} from './admin.js';
+} from '../server/admin.js';
 
 checkDbConfig();
 
