@@ -9,7 +9,7 @@
 <body>
   <!-- 顶栏 -->
   <header id="app-header" style="display:none">
-    <div class="brand">Rui生图</div>
+    <div class="brand">Rui生图 <span id="hdr-view-tag" class="tag" style="display:none"></span></div>
     <div class="hdr-right">
       <span id="hdr-role" class="tag"></span>
       <span>账号 <b id="hdr-phone"></b></span>
@@ -134,49 +134,190 @@
   </section>
 
   <!-- 管理端 -->
-  <section id="view-admin" class="view" style="display:none">
-    <div class="layout">
-      <nav class="tabs">
-        <button class="tab active" data-tab="users">用户管理</button>
-        <button class="tab" data-tab="pricing">计费规则</button>
-        <button class="tab" data-tab="genlogs">生图记录</button>
-        <button class="tab" data-tab="oplogs">操作日志</button>
+  <section id="view-admin" class="view admin-view" style="display:none">
+    <div class="admin-layout">
+      <!-- 左侧导航 -->
+      <nav class="admin-nav" id="admin-nav">
+        <div class="nav-item active" data-page="dash"><span class="nav-ico">📊</span>仪表盘</div>
+        <div class="nav-item" data-page="accounts"><span class="nav-ico">👤</span>账户管理</div>
+        <div class="nav-item" data-page="credits"><span class="nav-ico">💰</span>积分管理</div>
+        <div class="nav-item" data-page="pricing"><span class="nav-ico">🏷️</span>计费规则</div>
+        <div class="nav-item" data-page="records"><span class="nav-ico">🖼️</span>生图记录</div>
+        <div class="nav-item" data-page="oplogs"><span class="nav-ico">📝</span>操作日志</div>
+        <div class="nav-item" data-page="stats"><span class="nav-ico">📈</span>使用统计</div>
       </nav>
-      <main class="panel">
-        <!-- 用户管理 -->
-        <div id="tab-users" class="tab-panel">
-          <div class="row-between">
-            <h3>用户列表</h3>
-            <button id="btn-newuser" class="btn-sm">新增用户</button>
+
+      <!-- 右侧内容 -->
+      <main class="admin-content">
+
+        <!-- 仪表盘 -->
+        <div class="apage" id="apage-dash">
+          <div class="page-title">仪表盘</div>
+          <div class="page-sub">平台整体概览</div>
+          <div class="stat-grid" id="dash-cards"></div>
+          <div class="block">
+            <div class="block-title"><span class="tbar"></span>近 7 日生成趋势</div>
+            <div class="legend">
+              <span><i class="lg lg-gpt"></i> GPT Image 2</span>
+              <span><i class="lg lg-nano"></i> Nano Banana</span>
+            </div>
+            <div id="dash-trend"></div>
           </div>
-          <table id="user-table"><thead><tr>
-            <th>手机号</th><th>角色</th><th>状态</th><th>余额</th><th>操作</th>
-          </tr></thead><tbody></tbody></table>
         </div>
+
+        <!-- 账户管理 -->
+        <div class="apage" id="apage-accounts" style="display:none">
+          <div class="page-title">账户管理</div>
+          <div class="page-sub">创建内部账户、管理状态与权限（账户由管理员创建，无自注册）</div>
+          <div style="margin-bottom:14px">
+            <button class="btn-sm" id="btn-toggle-create">＋ 创建账户</button>
+          </div>
+          <div class="block" id="create-box" style="display:none">
+            <div class="block-title"><span class="tbar"></span>新建账户</div>
+            <div class="form-row"><div class="flabel">手机号</div><input class="finput" id="nu-phone" placeholder="11 位手机号"></div>
+            <div class="form-row"><div class="flabel">密码</div><input class="finput" id="nu-pwd" type="password" placeholder="设置登录密码"></div>
+            <div class="form-row"><div class="flabel">确认密码</div><input class="finput" id="nu-pwd2" type="password" placeholder="再次输入密码"></div>
+            <div class="form-row"><div class="flabel">初始积分</div><input class="finput" id="nu-balance" type="number" value="0"></div>
+            <div class="form-row"><div class="flabel">角色</div>
+              <select class="finput" id="nu-role">
+                <option value="user">普通用户（user）</option>
+                <option value="admin">管理员（admin）</option>
+              </select>
+            </div>
+            <div><button class="btn-sm" id="btn-newuser">确认创建</button>
+            <button class="btn-sm ghost" id="btn-cancel-create">取消</button></div>
+            <div id="nu-msg" class="msg"></div>
+          </div>
+          <div class="block">
+            <div class="block-title"><span class="tbar"></span>账户列表 <span class="td-muted" id="user-count"></span></div>
+            <table id="user-table"><thead><tr>
+              <th>手机号</th><th>角色</th><th>状态</th><th>剩余积分</th><th>创建时间</th><th>操作</th>
+            </tr></thead><tbody></tbody></table>
+            <div class="note">管理员账号不可冻结/删除；冻结后该用户无法登录与生图，积分保留。</div>
+          </div>
+        </div>
+
+        <!-- 积分管理 -->
+        <div class="apage" id="apage-credits" style="display:none">
+          <div class="page-title">积分管理</div>
+          <div class="page-sub">为账户充值或扣减积分（内部虚拟额度，操作留痕于操作日志）</div>
+          <div class="block">
+            <table id="credit-table"><thead><tr>
+              <th>账户</th><th>剩余积分</th><th>本月已消耗</th><th>操作</th>
+            </tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
         <!-- 计费规则 -->
-        <div id="tab-pricing" class="tab-panel" style="display:none">
-          <h3>计费规则（每次生成扣除积分）</h3>
-          <table id="pricing-table"><thead><tr>
-            <th>方式</th><th>当前积分</th><th>改为</th><th>操作</th>
-          </tr></thead><tbody></tbody></table>
+        <div class="apage" id="apage-pricing" style="display:none">
+          <div class="page-title">计费规则</div>
+          <div class="page-sub">设置每种生图方式消耗的积分（4 种方式独立配置）</div>
+          <div class="block">
+            <div class="block-title"><span class="tbar"></span>生图方式 → 扣分设置</div>
+            <table id="pricing-table"><thead><tr>
+              <th>生图方式</th><th>引擎</th><th>每次扣分</th><th>说明</th><th>操作</th>
+            </tr></thead><tbody></tbody></table>
+            <div class="note">提交时预扣积分，失败自动返还。修改后即时生效，并写入操作日志。</div>
+          </div>
         </div>
+
         <!-- 生图记录 -->
-        <div id="tab-genlogs" class="tab-panel" style="display:none">
-          <h3>生图记录</h3>
-          <table id="genlog-table"><thead><tr>
-            <th>时间</th><th>方式</th><th>prompt</th><th>积分</th><th>状态</th><th>图</th>
-          </tr></thead><tbody></tbody></table>
+        <div class="apage" id="apage-records" style="display:none">
+          <div class="page-title">生图记录</div>
+          <div class="page-sub">查看全部用户的生图记录与积分消耗（结果图仅存 URL，约 5 天过期）</div>
+          <div class="filter-row">
+            <div class="filter-item"><span class="flabel-sm">用户</span>
+              <select class="finput" id="flt-user"><option value="">全部用户</option></select>
+            </div>
+            <div class="filter-item"><span class="flabel-sm">生图方式</span>
+              <select class="finput" id="flt-method">
+                <option value="">全部方式</option>
+                <option value="image2_t2i">image2 文生图</option>
+                <option value="image2_i2i">image2 图生图</option>
+                <option value="nano_t2i">nano 文生图</option>
+                <option value="nano_i2i">nano 图生图</option>
+              </select>
+            </div>
+            <div class="filter-item"><span class="flabel-sm">状态</span>
+              <select class="finput" id="flt-status">
+                <option value="">全部状态</option>
+                <option value="success">成功</option>
+                <option value="fail">失败</option>
+                <option value="pending">进行中</option>
+              </select>
+            </div>
+            <div class="filter-item"><span class="flabel-sm">时间</span>
+              <select class="finput" id="flt-days">
+                <option value="7">最近 7 天</option>
+                <option value="30">最近 30 天</option>
+                <option value="">全部</option>
+              </select>
+            </div>
+            <button class="btn-sm" id="btn-filter">筛选</button>
+            <button class="btn-sm ghost" id="btn-export">导出 CSV</button>
+          </div>
+          <div class="block">
+            <table id="genlog-table"><thead><tr>
+              <th>用户</th><th>方式</th><th>提示词</th><th>参考图</th><th>结果图</th><th>扣分</th><th>状态</th><th>时间</th>
+            </tr></thead><tbody></tbody></table>
+            <div class="note">「参考图」列仅图生图有值；结果图 URL 超过约 5 天会失效。</div>
+          </div>
         </div>
+
         <!-- 操作日志 -->
-        <div id="tab-oplogs" class="tab-panel" style="display:none">
-          <h3>操作日志</h3>
-          <table id="oplog-table"><thead><tr>
-            <th>时间</th><th>动作</th><th>对象</th><th>详情</th>
-          </tr></thead><tbody></tbody></table>
+        <div class="apage" id="apage-oplogs" style="display:none">
+          <div class="page-title">操作日志</div>
+          <div class="page-sub">账户与积分相关操作的留痕（只读）</div>
+          <div class="block">
+            <table id="oplog-table"><thead><tr>
+              <th>时间</th><th>管理员</th><th>动作</th><th>对象</th><th>详情</th>
+            </tr></thead><tbody></tbody></table>
+          </div>
         </div>
+
+        <!-- 使用统计 -->
+        <div class="apage" id="apage-stats" style="display:none">
+          <div class="page-title">使用统计</div>
+          <div class="page-sub">消耗与用量分析（只读）</div>
+          <div class="stat-grid" id="stats-cards"></div>
+          <div class="block">
+            <div class="block-title"><span class="tbar"></span>各生图方式使用量</div>
+            <div id="stats-methods"></div>
+          </div>
+          <div class="block">
+            <div class="block-title"><span class="tbar"></span>各用户消耗排名</div>
+            <div id="stats-ranking"></div>
+            <div class="note">消耗排名仅统计有消耗的内部用户（管理员不计费）。</div>
+          </div>
+        </div>
+
       </main>
     </div>
   </section>
+
+  <!-- 调整积分弹窗 -->
+  <div id="adjust-modal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div class="row-between" style="margin-bottom:12px">
+        <b>调整积分</b>
+        <span id="adjust-close" style="cursor:pointer;color:#888;font-size:18px">✕</span>
+      </div>
+      <div class="sub">当前操作：<b id="adj-phone"></b>（剩余 <b id="adj-balance" style="color:#1664ff"></b> 分）</div>
+      <label>操作类型
+        <select id="adj-type">
+          <option value="add">充值（增加）</option>
+          <option value="sub">扣减（减少）</option>
+        </select>
+      </label>
+      <label>数额 <input id="adj-amount" type="number" min="1" placeholder="输入积分数量，如 500"></label>
+      <label>备注 <input id="adj-remark" type="text" placeholder="选填，如「7月额度」"></label>
+      <div class="modal-foot">
+        <button id="adj-ok" class="btn-sm">确认调整</button>
+        <button id="adj-cancel" class="btn-sm ghost">取消</button>
+      </div>
+      <div id="adj-msg" class="msg"></div>
+    </div>
+  </div>
 
   <!-- 通用弹窗 -->
   <div id="modal" class="modal" style="display:none">

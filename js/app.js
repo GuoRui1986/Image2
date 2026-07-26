@@ -45,6 +45,11 @@ function route() {
     $('#hdr-balance').textContent = state.user.balance;
     $('#hdr-role').textContent = state.user.role === 'admin' ? '管理员' : '用户';
     $('#btn-to-admin').style.display = state.user.role === 'admin' ? 'inline-block' : 'none';
+    const vt = $('#hdr-view-tag');
+    vt.style.display = 'inline-block';
+    vt.textContent = h === '#/admin' ? '管理端' : '用户端';
+  } else {
+    $('#hdr-view-tag').style.display = 'none';
   }
   if (loggedIn && h === '#/admin' && state.user?.role === 'admin') loadAdminAll();
 }
@@ -215,101 +220,287 @@ async function pollTick() {
 }
 
 // ---------- 管理端 ----------
-function loadAdminAll() { loadUsers(); loadPricing(); loadGenLogs(); loadOpLogs(); }
-$$('.tab').forEach(t => t.addEventListener('click', () => {
-  $$('.tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  const name = t.dataset.tab;
-  ['users', 'pricing', 'genlogs', 'oplogs'].forEach(n =>
-    $('#tab-' + n).style.display = n === name ? 'block' : 'none');
-}));
+const METHOD_META = {
+  image2_t2i: { name: 'image2 文生图', engine: 'GPT Image 2', note: '真实成本约 ¥0.04/次' },
+  image2_i2i: { name: 'image2 图生图', engine: 'GPT Image 2', note: '带参考图，略高于文生图' },
+  nano_t2i: { name: 'nano 文生图', engine: 'Nano Banana', note: '真实成本约 ¥0.07/次' },
+  nano_i2i: { name: 'nano 图生图', engine: 'Nano Banana', note: '支持多张参考图（最多10张）' },
+};
+const mName = (m) => METHOD_META[m]?.name || m;
+const STATUS_BADGE = {
+  success: '<span class="badge ok">成功</span>',
+  fail: '<span class="badge fail">失败</span>',
+  pending: '<span class="badge run">进行中</span>',
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+let adminPage = 'dash';
+const adminLoaders = {
+  dash: loadDash, accounts: loadUsers, credits: loadCredits,
+  pricing: loadPricing, records: loadGenLogs, oplogs: loadOpLogs, stats: loadStats,
+};
+function showAdminPage(name) {
+  adminPage = name;
+  $$('#admin-nav .nav-item').forEach(x => x.classList.toggle('active', x.dataset.page === name));
+  $$('.apage').forEach(p => p.style.display = 'none');
+  $('#apage-' + name).style.display = 'block';
+  (adminLoaders[name] || (() => {}))();
+}
+$$('#admin-nav .nav-item').forEach(item =>
+  item.addEventListener('click', () => showAdminPage(item.dataset.page)));
+function loadAdminAll() { showAdminPage(adminPage); }
+
+function mkBtn(label, fn, cls = 'btn-sm') { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = fn; return b; }
+
+// ----- 仪表盘 -----
+async function loadDash() {
+  const { body } = await api('/api/admin/dashboard');
+  if (body.code !== 200) return;
+  const d = body.data;
+  $('#dash-cards').innerHTML = `
+    <div class="stat-card"><div class="label">总消耗积分</div><div class="num">${d.total_cost.toLocaleString()}<small>分</small></div></div>
+    <div class="stat-card"><div class="label">累计生成</div><div class="num">${d.total_count.toLocaleString()}<small>次</small></div></div>
+    <div class="stat-card"><div class="label">活跃用户</div><div class="num">${d.active_users}<small>/${d.total_users} 人</small></div></div>
+    <div class="stat-card"><div class="label">本月失败率</div><div class="num">${d.month_fail_rate}<small>%</small></div></div>`;
+  const max = Math.max(1, ...d.trend.map(t => t.total));
+  $('#dash-trend').innerHTML = d.trend.map(t => {
+    const wg = Math.round((t.image2 / max) * 100);
+    const wn = Math.round((t.nano / max) * 100);
+    return `<div class="bar-row"><div class="name">${t.label}</div><div class="bar-track">
+      ${t.image2 ? `<div class="bar-fill fill-gpt" style="width:${wg}%">${t.image2}</div>` : ''}
+      ${t.nano ? `<div class="bar-fill fill-nano" style="width:${wn}%">${t.nano}</div>` : ''}
+    </div><div class="val">${t.total} 次</div></div>`;
+  }).join('');
+}
+
+// ----- 账户管理 -----
+$('#btn-toggle-create').addEventListener('click', () => {
+  const box = $('#create-box');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+});
+$('#btn-cancel-create').addEventListener('click', () => { $('#create-box').style.display = 'none'; });
+$('#btn-newuser').addEventListener('click', async () => {
+  const msg = $('#nu-msg'); msg.className = 'msg';
+  const phone = $('#nu-phone').value.trim();
+  const pwd = $('#nu-pwd').value, pwd2 = $('#nu-pwd2').value;
+  if (!/^1\d{10}$/.test(phone)) { msg.textContent = '请输入 11 位手机号'; msg.classList.add('err'); return; }
+  if (!pwd) { msg.textContent = '请设置密码'; msg.classList.add('err'); return; }
+  if (pwd !== pwd2) { msg.textContent = '两次密码不一致'; msg.classList.add('err'); return; }
+  const { body } = await post('/api/admin/users', {
+    phone, password: pwd, balance: +($('#nu-balance').value || 0), role: $('#nu-role').value,
+  });
+  if (body.code !== 200) { msg.textContent = body.msg; msg.classList.add('err'); return; }
+  msg.textContent = '创建成功'; msg.classList.add('ok');
+  $('#nu-phone').value = ''; $('#nu-pwd').value = ''; $('#nu-pwd2').value = ''; $('#nu-balance').value = '0';
+  loadUsers();
+});
 
 async function loadUsers() {
   const { body } = await api('/api/admin/users');
   if (body.code !== 200) return;
+  $('#user-count').textContent = `共 ${body.data.length} 人`;
   const tb = $('#user-table tbody'); tb.innerHTML = '';
   body.data.forEach(u => {
     const tr = document.createElement('tr');
     const frozen = u.status === 'frozen';
-    tr.innerHTML = `<td>${u.phone}</td><td>${u.role}</td>
-      <td class="${frozen ? 'st-frozen' : 'st-active'}">${frozen ? '已冻结' : '正常'}</td>
-      <td>${u.balance}</td><td class="ops"></td>`;
+    const isAdmin = u.role === 'admin';
+    tr.innerHTML = `<td>${esc(u.phone)}</td>
+      <td><span class="badge role">${u.role}</span></td>
+      <td>${frozen ? '<span class="badge dis">已冻结</span>' : '<span class="badge ok">正常</span>'}</td>
+      <td>${isAdmin ? '∞' : u.balance}</td>
+      <td class="td-muted">${(u.created_at || '').slice(0, 10)}</td><td class="ops"></td>`;
     const ops = tr.querySelector('.ops');
-    if (u.role !== 'admin') {
-      ops.appendChild(mkBtn(frozen ? '解冻' : '冻结', () => userAction(u.id, frozen ? 'unfreeze' : 'freeze')));
-      ops.appendChild(mkBtn('改密', () => {
+    if (!isAdmin) {
+      ops.appendChild(mkBtn(frozen ? '启用' : '冻结', () => userAction(u.id, frozen ? 'unfreeze' : 'freeze'), frozen ? 'btn-sm' : 'btn-sm warn'));
+      ops.appendChild(mkBtn('重置密码', () => {
         const p = prompt('输入新密码'); if (p) userAction(u.id, 'reset_pwd', { password: p });
-      }));
-      ops.appendChild(mkBtn('调积分', () => {
-        const d = prompt('积分增减（正加负减，如 100 / -50）'); if (d) userAction(u.id, 'adjust_credit', { delta: +d });
-      }));
-      ops.appendChild(mkBtn('删除', () => { if (confirm('确认软删除？')) userDel(u.id); }));
+      }, 'btn-sm ghost'));
+      ops.appendChild(mkBtn('删除', () => { if (confirm(`确认删除 ${u.phone}？（软删除，记录保留）`)) userDel(u.id); }, 'btn-sm danger'));
+    } else {
+      ops.innerHTML = '<span class="td-muted">—</span>';
     }
     tb.appendChild(tr);
   });
 }
-function mkBtn(label, fn) { const b = document.createElement('button'); b.className = 'btn-sm'; b.textContent = label; b.onclick = fn; return b; }
 async function userAction(id, action, extra = {}) {
   const { body } = await api('/api/admin/users/' + id, { method: 'PUT', body: JSON.stringify({ action, ...extra }) });
-  alert(body.msg || (body.code === 200 ? 'ok' : '失败'));
-  if (body.code === 200) loadUsers();
+  if (body.code !== 200) alert(body.msg || '失败');
+  loadUsers();
 }
 async function userDel(id) {
   const { body } = await api('/api/admin/users/' + id, { method: 'DELETE' });
-  alert(body.msg || (body.code === 200 ? 'ok' : '失败'));
-  if (body.code === 200) loadUsers();
+  if (body.code !== 200) alert(body.msg || '失败');
+  loadUsers();
 }
-$('#btn-newuser').addEventListener('click', async () => {
-  const phone = prompt('手机号'); if (!phone) return;
-  const password = prompt('初始密码'); if (!password) return;
-  const balance = prompt('初始积分', '0') || '0';
-  const { body } = await post('/api/admin/users', { phone, password, balance: +balance });
-  alert(body.msg || (body.code === 200 ? 'ok' : '失败'));
-  if (body.code === 200) loadUsers();
+
+// ----- 积分管理 -----
+let adjustTarget = null;
+async function loadCredits() {
+  const { body } = await api('/api/admin/credits');
+  if (body.code !== 200) return;
+  const tb = $('#credit-table tbody'); tb.innerHTML = '';
+  body.data.forEach(u => {
+    const tr = document.createElement('tr');
+    const isAdmin = u.role === 'admin';
+    tr.innerHTML = `<td>${esc(u.phone)}${isAdmin ? '（管理员）' : ''}</td>
+      <td>${isAdmin ? '∞' : u.balance}</td>
+      <td>${isAdmin ? '—' : u.month_cost}</td><td class="ops"></td>`;
+    const ops = tr.querySelector('.ops');
+    if (!isAdmin) ops.appendChild(mkBtn('调整', () => openAdjust(u)));
+    else ops.innerHTML = '<span class="td-muted">—</span>';
+    tb.appendChild(tr);
+  });
+}
+function openAdjust(u) {
+  adjustTarget = u;
+  $('#adj-phone').textContent = u.phone;
+  $('#adj-balance').textContent = u.balance;
+  $('#adj-amount').value = ''; $('#adj-remark').value = '';
+  $('#adj-msg').className = 'msg'; $('#adj-msg').textContent = '';
+  $('#adjust-modal').style.display = 'flex';
+}
+function closeAdjust() { $('#adjust-modal').style.display = 'none'; adjustTarget = null; }
+$('#adjust-close').addEventListener('click', closeAdjust);
+$('#adj-cancel').addEventListener('click', closeAdjust);
+$('#adjust-modal').addEventListener('click', (e) => { if (e.target === $('#adjust-modal')) closeAdjust(); });
+$('#adj-ok').addEventListener('click', async () => {
+  if (!adjustTarget) return;
+  const msg = $('#adj-msg'); msg.className = 'msg';
+  const n = Math.abs(+$('#adj-amount').value);
+  if (!n) { msg.textContent = '请输入正确的数额'; msg.classList.add('err'); return; }
+  const delta = $('#adj-type').value === 'sub' ? -n : n;
+  const { body } = await api('/api/admin/users/' + adjustTarget.id, {
+    method: 'PUT',
+    body: JSON.stringify({ action: 'adjust_credit', delta, remark: $('#adj-remark').value.trim() }),
+  });
+  if (body.code !== 200) { msg.textContent = body.msg || '失败'; msg.classList.add('err'); return; }
+  closeAdjust(); loadCredits();
 });
 
+// ----- 计费规则 -----
 async function loadPricing() {
   const { body } = await api('/api/admin/pricing');
   if (body.code !== 200) return;
   const tb = $('#pricing-table tbody'); tb.innerHTML = '';
+  const order = ['image2_t2i', 'image2_i2i', 'nano_t2i', 'nano_i2i'];
+  body.data.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   body.data.forEach(r => {
+    const meta = METHOD_META[r.type] || { name: r.type, engine: '-', note: '' };
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.type}</td><td>${r.cost}</td>
-      <td><input type="number" min="0" value="${r.cost}" style="width:90px"></td>
-      <td></td>`;
+    tr.innerHTML = `<td>${meta.name}</td><td class="td-muted">${meta.engine}</td>
+      <td><input class="finput" type="number" min="0" value="${r.cost}" style="max-width:90px"></td>
+      <td class="td-muted">${meta.note}</td><td></td>`;
     const inp = tr.querySelector('input');
-    const btn = mkBtn('保存', async () => {
+    tr.querySelector('td:last-child').appendChild(mkBtn('保存', async () => {
       const { body: b2 } = await api('/api/admin/pricing/' + r.type, { method: 'PUT', body: JSON.stringify({ cost: +inp.value }) });
-      alert(b2.msg || (b2.code === 200 ? 'ok' : '失败')); if (b2.code === 200) loadPricing();
-    });
-    tr.querySelector('td:last-child').appendChild(btn);
+      if (b2.code !== 200) alert(b2.msg || '失败');
+      loadPricing();
+    }));
     tb.appendChild(tr);
+  });
+}
+
+// ----- 生图记录 -----
+let genLogCache = [];
+async function loadFilterUsers() {
+  const sel = $('#flt-user');
+  if (sel.options.length > 1) return;
+  const { body } = await api('/api/admin/users');
+  if (body.code !== 200) return;
+  body.data.forEach(u => {
+    const o = document.createElement('option');
+    o.value = u.id; o.textContent = u.phone;
+    sel.appendChild(o);
   });
 }
 async function loadGenLogs() {
-  const { body } = await api('/api/admin/logs/generation');
+  loadFilterUsers();
+  const qs = new URLSearchParams();
+  if ($('#flt-user').value) qs.set('user_id', $('#flt-user').value);
+  if ($('#flt-method').value) qs.set('method', $('#flt-method').value);
+  if ($('#flt-status').value) qs.set('status', $('#flt-status').value);
+  if ($('#flt-days').value) qs.set('days', $('#flt-days').value);
+  const { body } = await api('/api/admin/logs/generation?' + qs.toString());
   if (body.code !== 200) return;
+  genLogCache = body.data;
   const tb = $('#genlog-table tbody'); tb.innerHTML = '';
   body.data.forEach(g => {
     const tr = document.createElement('tr');
-    const img = g.result_image ? `<a href="${g.result_image}" target="_blank">查看</a>` : '-';
-    tr.innerHTML = `<td>${g.created_at?.slice(0, 19)}</td><td>${g.method}</td>
-      <td>${(g.prompt || '').slice(0, 30)}</td><td>${g.cost}</td>
-      <td class="${g.status === 'success' ? 'st-active' : (g.status === 'fail' ? 'st-frozen' : '')}">${g.status}</td>
-      <td>${img}</td>`;
+    const refs = Array.isArray(g.ref_images) && g.ref_images.length
+      ? `<span class="thumb-ph">参×${g.ref_images.length}</span>` : '<span class="td-muted">—</span>';
+    const result = g.result_image
+      ? `<img class="thumb-img" src="${esc(g.result_image)}" onerror="this.outerHTML='<span class=&quot;thumb-ph&quot;>过期</span>'" data-url="${esc(g.result_image)}" data-prompt="${esc(g.prompt || '')}">`
+      : '<span class="td-muted">无</span>';
+    tr.innerHTML = `<td>${esc(g.phone)}</td><td class="td-muted">${mName(g.method)}</td>
+      <td class="td-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.prompt)}">${esc((g.prompt || '').slice(0, 40))}</td>
+      <td>${refs}</td><td class="res-cell"></td>
+      <td>${g.cost ? '-' + g.cost : 0}</td>
+      <td>${STATUS_BADGE[g.status] || esc(g.status)}</td>
+      <td class="td-muted">${(g.created_at || '').slice(5, 16).replace('T', ' ')}</td>`;
+    tr.querySelector('.res-cell').innerHTML = result;
+    const im = tr.querySelector('.thumb-img');
+    if (im) im.addEventListener('click', () => {
+      $('#preview-img').src = im.dataset.url;
+      $('#preview-prompt').textContent = im.dataset.prompt || '无提示词';
+      $('#preview-modal').style.display = 'flex';
+    });
     tb.appendChild(tr);
   });
 }
+$('#btn-filter').addEventListener('click', loadGenLogs);
+$('#btn-export').addEventListener('click', () => {
+  if (!genLogCache.length) { alert('无可导出数据'); return; }
+  const head = ['用户', '方式', '提示词', '参考图数', '结果图URL', '扣分', '状态', '时间'];
+  const lines = [head.join(',')].concat(genLogCache.map(g => [
+    g.phone, mName(g.method), '"' + (g.prompt || '').replace(/"/g, '""') + '"',
+    Array.isArray(g.ref_images) ? g.ref_images.length : 0,
+    g.result_image || '', g.cost, g.status, g.created_at,
+  ].join(',')));
+  const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '生图记录-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+// ----- 操作日志 -----
+const ACTION_NAME = {
+  create_user: '创建账户', freeze: '冻结账户', unfreeze: '启用账户',
+  reset_pwd: '重置密码', delete_user: '删除账户', adjust_credit: '调整积分', update_pricing: '修改计费',
+};
 async function loadOpLogs() {
   const { body } = await api('/api/admin/logs/operation');
   if (body.code !== 200) return;
   const tb = $('#oplog-table tbody'); tb.innerHTML = '';
   body.data.forEach(o => {
+    const target = o.target_type === 'pricing' ? '计费规则' : (o.target_phone || o.target_id || '');
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${o.created_at?.slice(0, 19)}</td><td>${o.action}</td>
-      <td>${o.target_type || ''} ${o.target_id || ''}</td><td>${o.detail || ''}</td>`;
+    tr.innerHTML = `<td class="td-muted">${(o.created_at || '').slice(5, 16).replace('T', ' ')}</td>
+      <td>${esc(o.admin_phone || '')}</td>
+      <td>${ACTION_NAME[o.action] || esc(o.action)}</td>
+      <td>${esc(target)}</td><td class="td-muted">${esc(o.detail || '')}</td>`;
     tb.appendChild(tr);
   });
+}
+
+// ----- 使用统计 -----
+async function loadStats() {
+  const { body } = await api('/api/admin/stats');
+  if (body.code !== 200) return;
+  const d = body.data;
+  $('#stats-cards').innerHTML = `
+    <div class="stat-card"><div class="label">总消耗</div><div class="num">${d.total_cost.toLocaleString()}<small>分</small></div></div>
+    <div class="stat-card"><div class="label">总生成次数</div><div class="num">${d.total_count.toLocaleString()}<small>次</small></div></div>
+    <div class="stat-card"><div class="label">平均单次成本</div><div class="num">${d.avg_cost}<small>分</small></div></div>
+    <div class="stat-card"><div class="label">成功 / 失败</div><div class="num">${d.success} / ${d.fail}</div></div>`;
+  const maxC = Math.max(1, ...d.methods.map(m => m.count));
+  $('#stats-methods').innerHTML = d.methods.map(m => `
+    <div class="bar-row"><div class="name">${mName(m.method)}</div>
+      <div class="bar-track"><div class="bar-fill fill-gpt" style="width:${Math.max(6, Math.round((m.count / maxC) * 100))}%">${m.count} 次</div></div>
+      <div class="val">${m.cost.toLocaleString()} 分</div></div>`).join('') || '<div class="td-muted">暂无数据</div>';
+  $('#stats-ranking').innerHTML = d.ranking.map((r, i) => `
+    <div class="rank"><div class="no ${i < 3 ? 'top' : ''}">${i + 1}</div>
+      <div class="who">${esc(r.phone)}</div><div class="score">${r.cost.toLocaleString()} 分</div></div>`).join('') || '<div class="td-muted">暂无消耗记录</div>';
 }
 
 // ---------- 顶栏按钮 ----------

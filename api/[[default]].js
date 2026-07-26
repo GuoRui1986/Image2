@@ -441,24 +441,25 @@ async function listUsers(c) {
 }
 
 async function createUser(c) {
-  const { phone, password, balance } = await c.req.json();
+  const { phone, password, balance, role } = await c.req.json();
   if (!phone || !password) {
     return c.json({ code: 400, msg: '手机号与密码必填' }, 400);
   }
+  const safeRole = role === 'admin' ? 'admin' : 'user';
   const hashStr = await hash(password, 10);
   const { data, error } = await supabase
     .from('users')
-    .insert({ phone, password_hash: hashStr, balance: Number(balance) || 0, role: 'user' })
+    .insert({ phone, password_hash: hashStr, balance: Number(balance) || 0, role: safeRole })
     .select('id, phone, balance')
     .single();
   if (error) return c.json({ code: 400, msg: '创建失败：' + error.message }, 400);
-  await logOp(c.get('user').id, 'create_user', 'user', data.id, `创建用户 ${phone}`);
+  await logOp(c.get('user').id, 'create_user', 'user', data.id, `创建用户 ${phone}（角色 ${safeRole}）`);
   return c.json({ code: 200, data });
 }
 
 async function updateUser(c) {
   const id = c.req.param('id');
-  const { action, password, delta } = await c.req.json();
+  const { action, password, delta, remark } = await c.req.json();
   const { data: target, error: te } = await supabase
     .from('users')
     .select('id, role, balance, phone')
@@ -492,7 +493,7 @@ async function updateUser(c) {
     const newBal = target.balance + d;
     if (newBal < 0) return c.json({ code: 400, msg: '余额不能为负' }, 400);
     await supabase.from('users').update({ balance: newBal }).eq('id', id);
-    await logOp(c.get('user').id, 'adjust_credit', 'user', id, `调整积分 ${target.phone} ${d >= 0 ? '+' : ''}${d} → ${newBal}`);
+    await logOp(c.get('user').id, 'adjust_credit', 'user', id, `调整积分 ${target.phone} ${d >= 0 ? '+' : ''}${d} → ${newBal}${remark ? '（备注：' + remark + '）' : ''}`);
     return c.json({ code: 200, data: { balance: newBal } });
   }
   return c.json({ code: 400, msg: '未知 action' }, 400);
@@ -532,14 +533,33 @@ async function updatePricing(c) {
   return c.json({ code: 200, data: { ok: true } });
 }
 
+async function fetchUsersLite() {
+  const { data } = await supabase
+    .from('users')
+    .select('id, phone, role, status, balance, created_at, deleted_at');
+  return data || [];
+}
+
 async function listGenLogs(c) {
-  const { data, error } = await supabase
+  const { user_id, method, status, days } = c.req.query();
+  let q = supabase
     .from('generation_logs')
-    .select('id, task_id, user_id, method, prompt, cost, status, created_at, result_image')
+    .select('id, task_id, user_id, method, prompt, cost, status, created_at, result_image, ref_images')
     .order('created_at', { ascending: false })
     .limit(300);
+  if (user_id) q = q.eq('user_id', user_id);
+  if (method) q = q.eq('method', method);
+  if (status) q = q.eq('status', status);
+  const d = Number(days);
+  if (Number.isFinite(d) && d > 0) {
+    q = q.gte('created_at', new Date(Date.now() - d * 86400000).toISOString());
+  }
+  const { data, error } = await q;
   if (error) return c.json({ code: 500, msg: error.message }, 500);
-  return c.json({ code: 200, data });
+  const users = await fetchUsersLite();
+  const umap = Object.fromEntries(users.map((u) => [u.id, u.phone]));
+  const rows = (data || []).map((g) => ({ ...g, phone: umap[g.user_id] || g.user_id }));
+  return c.json({ code: 200, data: rows });
 }
 
 async function listOpLogs(c) {
@@ -549,7 +569,134 @@ async function listOpLogs(c) {
     .order('created_at', { ascending: false })
     .limit(300);
   if (error) return c.json({ code: 500, msg: error.message }, 500);
-  return c.json({ code: 200, data });
+  const users = await fetchUsersLite();
+  const umap = Object.fromEntries(users.map((u) => [u.id, u.phone]));
+  const rows = (data || []).map((o) => ({ ...o, admin_phone: umap[o.admin_id] || o.admin_id, target_phone: umap[o.target_id] || null }));
+  return c.json({ code: 200, data: rows });
+}
+
+// ===================== 统计聚合 =====================
+async function fetchGenLogsLite() {
+  const { data, error } = await supabase
+    .from('generation_logs')
+    .select('user_id, method, cost, status, created_at')
+    .limit(5000);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function dashboardHandler(c) {
+  let logs, users;
+  try {
+    logs = await fetchGenLogsLite();
+    users = await fetchUsersLite();
+  } catch (e) {
+    return c.json({ code: 500, msg: e.message }, 500);
+  }
+  const alive = users.filter((u) => !u.deleted_at);
+  const activeUsers = alive.filter((u) => u.status === 'active').length;
+
+  let totalCost = 0;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  let mTotal = 0, mFail = 0;
+
+  const days = [];
+  const dayMap = {};
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(now.getTime() - i * 86400000);
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    const row = { key, label: `${dt.getMonth() + 1}-${dt.getDate()}`, image2: 0, nano: 0, total: 0 };
+    days.push(row); dayMap[key] = row;
+  }
+
+  logs.forEach((g) => {
+    if (g.status === 'success') totalCost += g.cost || 0;
+    const t = new Date(g.created_at);
+    if (t >= monthStart) { mTotal++; if (g.status === 'fail') mFail++; }
+    const key = (g.created_at || '').slice(0, 10);
+    if (dayMap[key]) {
+      const row = dayMap[key];
+      if ((g.method || '').startsWith('image2')) row.image2++; else row.nano++;
+      row.total++;
+    }
+  });
+
+  return c.json({
+    code: 200,
+    data: {
+      total_cost: totalCost,
+      total_count: logs.length,
+      active_users: activeUsers,
+      total_users: alive.length,
+      month_fail_rate: mTotal ? +((mFail / mTotal) * 100).toFixed(1) : 0,
+      trend: days,
+    },
+  });
+}
+
+async function statsHandler(c) {
+  let logs, users;
+  try {
+    logs = await fetchGenLogsLite();
+    users = await fetchUsersLite();
+  } catch (e) {
+    return c.json({ code: 500, msg: e.message }, 500);
+  }
+  const umap = Object.fromEntries(users.map((u) => [u.id, u]));
+  let totalCost = 0, success = 0, fail = 0;
+  const methods = {};
+  const perUser = {};
+  logs.forEach((g) => {
+    if (g.status === 'success') { success++; totalCost += g.cost || 0; }
+    else if (g.status === 'fail') fail++;
+    const m = methods[g.method] || (methods[g.method] = { method: g.method, count: 0, cost: 0 });
+    m.count++;
+    if (g.status === 'success') m.cost += g.cost || 0;
+    const u = umap[g.user_id];
+    if (u && u.role !== 'admin' && g.status === 'success' && (g.cost || 0) > 0) {
+      perUser[g.user_id] = (perUser[g.user_id] || 0) + g.cost;
+    }
+  });
+  const ranking = Object.entries(perUser)
+    .map(([uid, cost]) => ({ phone: umap[uid]?.phone || uid, cost }))
+    .sort((a, b) => b.cost - a.cost);
+  return c.json({
+    code: 200,
+    data: {
+      total_cost: totalCost,
+      total_count: logs.length,
+      avg_cost: logs.length ? +(totalCost / Math.max(success, 1)).toFixed(1) : 0,
+      success, fail,
+      methods: Object.values(methods).sort((a, b) => b.count - a.count),
+      ranking,
+    },
+  });
+}
+
+async function creditsHandler(c) {
+  let logs, users;
+  try {
+    logs = await fetchGenLogsLite();
+    users = await fetchUsersLite();
+  } catch (e) {
+    return c.json({ code: 500, msg: e.message }, 500);
+  }
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthCost = {};
+  logs.forEach((g) => {
+    if (g.status === 'success' && new Date(g.created_at) >= monthStart) {
+      monthCost[g.user_id] = (monthCost[g.user_id] || 0) + (g.cost || 0);
+    }
+  });
+  const rows = users
+    .filter((u) => !u.deleted_at)
+    .map((u) => ({
+      id: u.id, phone: u.phone, role: u.role, balance: u.balance,
+      month_cost: monthCost[u.id] || 0,
+    }));
+  return c.json({ code: 200, data: rows });
 }
 
 // ===================== hono app =====================
@@ -588,5 +735,8 @@ app.get('/api/admin/pricing', listPricing);
 app.put('/api/admin/pricing/:type', updatePricing);
 app.get('/api/admin/logs/generation', listGenLogs);
 app.get('/api/admin/logs/operation', listOpLogs);
+app.get('/api/admin/dashboard', dashboardHandler);
+app.get('/api/admin/stats', statsHandler);
+app.get('/api/admin/credits', creditsHandler);
 
 export default app;
