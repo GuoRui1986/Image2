@@ -1,4 +1,4 @@
-// 多米生图平台 · 前端 SPA（原生 JS + hash 路由）
+// Rui生图 · 前端 SPA（原生 JS + hash 路由）
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -77,21 +77,32 @@ $('#sel-engine').addEventListener('change', syncUserControls);
 $('#sel-mode').addEventListener('change', syncUserControls);
 $('#inp-count').addEventListener('input', () => { $('#count-label').textContent = $('#inp-count').value + ' 张'; });
 
-// 参考图上传
-$('#inp-ref').addEventListener('change', async (e) => {
-  const files = [...e.target.files].slice(0, 10 - state.refItems.length);
+// 参考图上传（点击 + 拖拽）
+const refDrop = $('#ref-drop');
+const inpRef = $('#inp-ref');
+refDrop.addEventListener('click', () => inpRef.click());
+refDrop.addEventListener('dragover', (e) => { e.preventDefault(); refDrop.classList.add('dragover'); });
+refDrop.addEventListener('dragleave', () => refDrop.classList.remove('dragover'));
+refDrop.addEventListener('drop', (e) => {
+  e.preventDefault();
+  refDrop.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleRefFiles(e.dataTransfer.files);
+});
+inpRef.addEventListener('change', (e) => { if (e.target.files.length) handleRefFiles(e.target.files); });
+async function handleRefFiles(fileList) {
+  const files = [...fileList].slice(0, 10 - state.refItems.length);
   for (const f of files) {
     const b64 = await fileToBase64(f);
-      const { body } = await post('/api/upload-ref', { filename: f.name, contentBase64: b64 });
-      if (body.code === 200) {
-        state.refItems.push({ url: body.data.url, path: body.data.path, name: f.name });
-        renderRefs();
-      } else {
-        alert('上传失败：' + body.msg);
-      }
+    const { body } = await post('/api/upload-ref', { filename: f.name, contentBase64: b64 });
+    if (body.code === 200) {
+      state.refItems.push({ url: body.data.url, path: body.data.path, name: f.name });
+      renderRefs();
+    } else {
+      alert('上传失败：' + body.msg);
+    }
   }
-  e.target.value = '';
-});
+  inpRef.value = '';
+}
 function fileToBase64(f) {
   return new Promise((res) => {
     const r = new FileReader();
@@ -142,32 +153,51 @@ $('#btn-generate').addEventListener('click', async () => {
     try {
       const { body } = await post('/api/generate', payload);
       if (body.code !== 200) { msg.textContent = '第' + (i + 1) + '张失败：' + body.msg; msg.classList.add('err'); break; }
-      addCard(body.data.task_id);
+      addCard(body.data.task_id, payload.prompt);
       state.pollQueue.add(body.data.task_id);
     } catch (e) { msg.textContent = e.message; msg.classList.add('err'); break; }
   }
   startPoll();
 });
 
-function addCard(taskId) {
+function addCard(taskId, prompt) {
   const grid = $('#result-grid');
-  const c = document.createElement('div'); c.className = 'task-card'; c.dataset.task = taskId;
-  c.innerHTML = `<div class="task-status">排队中…</div><img class="task-img" style="display:none"><div class="task-actions"><a class="task-dl" style="display:none" target="_blank">下载</a></div>`;
+  const c = document.createElement('div'); c.className = 'result-item'; c.dataset.task = taskId; c.dataset.prompt = prompt || '';
+  c.innerHTML = `<div class="res-status">排队中…</div><div class="copy-prompt">复制提示词</div><img style="display:none">`;
+  c.addEventListener('click', () => openPreview(c.dataset.task));
   grid.prepend(c);
 }
 function updateCard(taskId, data) {
-  const c = $(`.task-card[data-task="${taskId}"]`); if (!c) return;
-  const st = c.querySelector('.task-status');
+  const c = $(`.result-item[data-task="${taskId}"]`); if (!c) return;
+  const st = c.querySelector('.res-status');
+  const img = c.querySelector('img');
   if (data.status === 'running') { st.textContent = '生成中…'; }
   else if (data.status === 'success') {
-    c.classList.add('success'); st.textContent = '完成（消耗 ' + (data.cost || 0) + ' 积分）';
-    const img = c.querySelector('.task-img'); img.src = data.url; img.style.display = 'block';
-    const dl = c.querySelector('.task-dl'); dl.href = data.url; dl.style.display = 'inline';
+    st.textContent = '完成' + (data.cost ? ' · ' + data.cost + '积分' : '');
+    st.classList.add('ok');
+    img.src = data.url; img.style.display = 'block';
+    c.dataset.url = data.url;
     refreshBalance();
   } else if (data.status === 'fail') {
-    c.classList.add('fail'); st.textContent = '失败（已返还积分）';
+    st.textContent = '失败（已返还）';
+    st.classList.add('fail');
   }
 }
+function openPreview(taskId) {
+  const c = $(`.result-item[data-task="${taskId}"]`); if (!c) return;
+  const img = c.querySelector('img');
+  if (!img.src || img.style.display === 'none') return;
+  $('#preview-img').src = img.src;
+  $('#preview-prompt').textContent = c.dataset.prompt || '无提示词';
+  $('#preview-modal').style.display = 'flex';
+}
+function closePreview() { $('#preview-modal').style.display = 'none'; }
+$('#preview-close').addEventListener('click', closePreview);
+$('#preview-modal').addEventListener('click', (e) => { if (e.target === $('#preview-modal')) closePreview(); });
+$('#preview-copy').addEventListener('click', async () => {
+  const t = $('#preview-prompt').textContent;
+  try { await navigator.clipboard.writeText(t); alert('提示词已复制'); } catch (_) { alert('复制失败，请手动复制'); }
+});
 function startPoll() { if (!state.pollTimer) state.pollTimer = setInterval(pollTick, 4000); }
 async function pollTick() {
   const ids = [...state.pollQueue];

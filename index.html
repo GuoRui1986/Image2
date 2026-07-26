@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>多米生图平台</title>
+  <title>Rui生图</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
   <!-- 顶栏 -->
   <header id="app-header" style="display:none">
-    <div class="brand">多米生图平台</div>
+    <div class="brand">Rui生图</div>
     <div class="hdr-right">
       <span id="hdr-role" class="tag"></span>
       <span>账号 <b id="hdr-phone"></b></span>
@@ -54,8 +54,14 @@
 
         <!-- 图生图参考图 -->
         <div id="ref-zone" style="display:none">
-          <div class="sub">参考图（最多 10 张，上传到临时桶）</div>
-          <input id="inp-ref" type="file" accept="image/*" multiple />
+          <div class="sub">参考图（最多 10 张，支持拖拽或点击上传）</div>
+          <div id="ref-drop" class="ref-drop">
+            <input id="inp-ref" type="file" accept="image/*" multiple hidden />
+            <div class="ref-drop-text">
+              <div>点击或拖拽图片到此处</div>
+              <div class="ref-drop-hint">最多 10 张，生成后会自动删除</div>
+            </div>
+          </div>
           <div id="ref-list" class="ref-list"></div>
         </div>
 
@@ -177,6 +183,18 @@
     <div class="modal-box">
       <div id="modal-body"></div>
       <div class="modal-foot"><button id="modal-close" class="btn-sm">关闭</button></div>
+    </div>
+  </div>
+
+  <!-- 图片预览弹窗 -->
+  <div id="preview-modal" class="modal" style="display:none">
+    <div class="preview-box">
+      <img id="preview-img" src="" alt="预览" />
+      <div class="preview-info">
+        <div id="preview-prompt" class="preview-prompt"></div>
+        <button id="preview-copy" class="btn-sm">复制提示词</button>
+        <button id="preview-close" class="btn-sm">关闭</button>
+      </div>
     </div>
   </div>
 
