@@ -1,10 +1,9 @@
-// IGA Pages Functions 单一入口（把所有后端模块内联，避免跨目录 import 导致部署 outputs 失败）
-// 约定：api/[[default]].js 作为 catch-all，export default app，平台接管监听，勿调 app.listen()
-import express from 'express';
+// IGA Pages Functions 单一入口（Hono + Edge Runtime 兼容）
+// 约定：api/[[default]].js 作为 catch-all，export default app，平台接管监听
+import { Hono } from 'hono';
 import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
+import { hash, compare } from 'bcrypt-ts';
+import { SignJWT, jwtVerify } from 'jose';
 
 // ===================== db =====================
 const url = process.env.SUPABASE_URL;
@@ -22,54 +21,64 @@ function checkDbConfig() {
   return true;
 }
 
+// ===================== utils =====================
+function base64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 // ===================== auth =====================
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
 const TOKEN_TTL = '7d';
+const encSecret = new TextEncoder().encode(JWT_SECRET);
 
-function signToken(user) {
-  return jwt.sign(
-    { sub: user.id, phone: user.phone, role: user.role },
-    JWT_SECRET,
-    { expiresIn: TOKEN_TTL }
-  );
+async function signToken(user) {
+  return new SignJWT({ sub: user.id, phone: user.phone, role: user.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime(TOKEN_TTL)
+    .sign(encSecret);
 }
 
-function verifyToken(token) {
+async function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, encSecret);
+    return payload;
   } catch {
     return null;
   }
 }
 
-function extractToken(req) {
-  const auth = req.headers['authorization'] || '';
+function extractToken(c) {
+  const auth = c.req.header('authorization') || '';
   if (auth.startsWith('Bearer ')) return auth.slice(7);
-  if (req.headers['x-auth-token']) return req.headers['x-auth-token'];
+  const x = c.req.header('x-auth-token');
+  if (x) return x;
   return null;
 }
 
-function authRequired(req, res, next) {
-  const token = extractToken(req);
-  const payload = token && verifyToken(token);
+async function authRequired(c, next) {
+  const token = extractToken(c);
+  const payload = token ? await verifyToken(token) : null;
   if (!payload) {
-    return res.status(401).json({ code: 401, msg: '未登录或登录已过期' });
+    return c.json({ code: 401, msg: '未登录或登录已过期' }, 401);
   }
-  req.user = { id: payload.sub, phone: payload.phone, role: payload.role };
-  next();
+  c.set('user', { id: payload.sub, phone: payload.phone, role: payload.role });
+  await next();
 }
 
-function adminRequired(req, res, next) {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ code: 403, msg: '需要管理员权限' });
+async function adminRequired(c, next) {
+  if (c.get('user')?.role !== 'admin') {
+    return c.json({ code: 403, msg: '需要管理员权限' }, 403);
   }
-  next();
+  await next();
 }
 
-async function login(req, res) {
-  const { phone, password } = req.body || {};
+async function login(c) {
+  const { phone, password } = await c.req.json();
   if (!phone || !password) {
-    return res.status(400).json({ code: 400, msg: '手机号或密码缺失' });
+    return c.json({ code: 400, msg: '手机号或密码缺失' }, 400);
   }
   const { data: user, error } = await supabase
     .from('users')
@@ -77,17 +86,17 @@ async function login(req, res) {
     .eq('phone', phone)
     .single();
   if (error || !user) {
-    return res.status(401).json({ code: 401, msg: '账号不存在' });
+    return c.json({ code: 401, msg: '账号不存在' }, 401);
   }
   if (user.status === 'frozen') {
-    return res.status(403).json({ code: 403, msg: '账号已冻结' });
+    return c.json({ code: 403, msg: '账号已冻结' }, 403);
   }
-  const ok = await bcrypt.compare(password, user.password_hash);
+  const ok = await compare(password, user.password_hash);
   if (!ok) {
-    return res.status(401).json({ code: 401, msg: '密码错误' });
+    return c.json({ code: 401, msg: '密码错误' }, 401);
   }
-  const token = signToken(user);
-  return res.json({
+  const token = await signToken(user);
+  return c.json({
     code: 200,
     data: { token, role: user.role, balance: user.balance, phone: user.phone },
   });
@@ -109,10 +118,10 @@ async function seedAdmin() {
     console.log('[seedAdmin] 管理员已存在，跳过');
     return;
   }
-  const hash = await bcrypt.hash(pwd, 10);
+  const hashStr = await hash(pwd, 10);
   const { error } = await supabase
     .from('users')
-    .insert({ phone, password_hash: hash, role: 'admin', balance: 999999 });
+    .insert({ phone, password_hash: hashStr, role: 'admin', balance: 999999 });
   if (error) {
     console.error('[seedAdmin] 创建失败:', error.message);
   } else {
@@ -120,16 +129,17 @@ async function seedAdmin() {
   }
 }
 
-async function me(req, res) {
-  const { data: user, error } = await supabase
+async function me(c) {
+  const user = c.get('user');
+  const { data, error } = await supabase
     .from('users')
     .select('id, phone, balance, role, status, created_at')
-    .eq('id', req.user.id)
+    .eq('id', user.id)
     .single();
-  if (error || !user) {
-    return res.status(404).json({ code: 404, msg: '用户不存在' });
+  if (error || !data) {
+    return c.json({ code: 404, msg: '用户不存在' }, 404);
   }
-  return res.json({ code: 200, data: user });
+  return c.json({ code: 200, data });
 }
 
 // ===================== domi =====================
@@ -238,8 +248,8 @@ async function uploadRef(filename, contentBase64) {
   const ext = (filename.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
   const safeExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext) ? ext : 'png';
   const contentType = safeExt === 'jpg' ? 'image/jpeg' : `image/${safeExt}`;
-  const path = `temp/${randomUUID()}-${filename.replace(/[^\w.-]/g, '_')}`;
-  const buf = Buffer.from(contentBase64, 'base64');
+  const path = `temp/${crypto.randomUUID()}-${filename.replace(/[^\w.-]/g, '_')}`;
+  const buf = base64ToUint8Array(contentBase64);
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -256,32 +266,32 @@ async function deleteRef(path) {
   if (error) console.error('[storage] 删除失败', error.message);
 }
 
-async function uploadRefHandler(req, res) {
-  const { filename, contentBase64 } = req.body || {};
+async function uploadRefHandler(c) {
+  const { filename, contentBase64 } = await c.req.json();
   try {
     const r = await uploadRef(filename, contentBase64);
-    return res.json({ code: 200, data: r });
+    return c.json({ code: 200, data: r });
   } catch (e) {
-    return res.status(400).json({ code: 400, msg: e.message });
+    return c.json({ code: 400, msg: e.message }, 400);
   }
 }
 
 // ===================== generate =====================
 const VALID_METHODS = ['image2_t2i', 'image2_i2i', 'nano_t2i', 'nano_i2i'];
 
-async function generate(req, res) {
-  const u = req.user;
-  const b = req.body || {};
+async function generate(c) {
+  const u = c.get('user');
+  const b = await c.req.json();
   const {
     method, prompt, image_urls, size, quality,
     aspect_ratio, image_size, oversea, model, ref_paths,
   } = b;
 
   if (!VALID_METHODS.includes(method)) {
-    return res.status(400).json({ code: 400, msg: '未知生图方式' });
+    return c.json({ code: 400, msg: '未知生图方式' }, 400);
   }
   if (!prompt || !prompt.trim()) {
-    return res.status(400).json({ code: 400, msg: 'prompt 不能为空' });
+    return c.json({ code: 400, msg: 'prompt 不能为空' }, 400);
   }
 
   let cost = 0;
@@ -292,13 +302,13 @@ async function generate(req, res) {
       .eq('type', method)
       .single();
     if (error || !rule) {
-      return res.status(500).json({ code: 500, msg: '计费规则缺失：' + (error?.message || method) });
+      return c.json({ code: 500, msg: '计费规则缺失：' + (error?.message || method) }, 500);
     }
     cost = rule.cost;
     try {
       await supabase.rpc('deduct_points', { p_user: u.id, p_amount: cost });
     } catch (e) {
-      return res.status(400).json({ code: 400, msg: '积分不足' });
+      return c.json({ code: 400, msg: '积分不足' }, 400);
     }
   }
 
@@ -319,7 +329,7 @@ async function generate(req, res) {
       try { await supabase.rpc('refund_points', { p_user: u.id, p_amount: cost }); }
       catch (_) { /* 返还失败仅记日志 */ }
     }
-    return res.status(502).json({ code: 502, msg: '提交生图失败：' + e.message });
+    return c.json({ code: 502, msg: '提交生图失败：' + e.message }, 502);
   }
 
   const { error: insErr } = await supabase
@@ -344,7 +354,7 @@ async function generate(req, res) {
     });
   if (insErr) console.error('[generate] 插入记录失败', insErr.message);
 
-  return res.json({ code: 200, data: { task_id, cost } });
+  return c.json({ code: 200, data: { task_id, cost } });
 }
 
 // ===================== status =====================
@@ -356,34 +366,34 @@ async function cleanupRefs(refPaths) {
   }
 }
 
-async function statusQuery(req, res) {
-  const u = req.user;
-  const { task_id } = req.body || {};
-  if (!task_id) return res.status(400).json({ code: 400, msg: 'task_id 缺失' });
+async function statusQuery(c) {
+  const u = c.get('user');
+  const { task_id } = await c.req.json();
+  if (!task_id) return c.json({ code: 400, msg: 'task_id 缺失' }, 400);
 
   const { data: log, error } = await supabase
     .from('generation_logs')
     .select('*')
     .eq('task_id', task_id)
     .single();
-  if (error || !log) return res.status(404).json({ code: 404, msg: '任务不存在' });
+  if (error || !log) return c.json({ code: 404, msg: '任务不存在' }, 404);
 
   if (log.status === 'success') {
-    return res.json({ code: 200, data: { status: 'success', url: log.result_image, cost: log.cost } });
+    return c.json({ code: 200, data: { status: 'success', url: log.result_image, cost: log.cost } });
   }
   if (log.status === 'fail') {
-    return res.json({ code: 200, data: { status: 'fail', cost: log.cost } });
+    return c.json({ code: 200, data: { status: 'fail', cost: log.cost } });
   }
 
   let q;
   try {
     q = await domiQuery(log.method, task_id);
   } catch (e) {
-    return res.status(502).json({ code: 502, msg: '查询失败：' + e.message });
+    return c.json({ code: 502, msg: '查询失败：' + e.message }, 502);
   }
 
   if (q.status === 'running') {
-    return res.json({ code: 200, data: { status: 'running' } });
+    return c.json({ code: 200, data: { status: 'running' } });
   }
 
   if (q.status === 'success') {
@@ -393,7 +403,7 @@ async function statusQuery(req, res) {
       .eq('task_id', task_id);
     if (upErr) console.error('[status] 更新成功记录失败', upErr.message);
     await cleanupRefs(log.params?.ref_paths);
-    return res.json({ code: 200, data: { status: 'success', url: q.imageUrl, cost: log.cost } });
+    return c.json({ code: 200, data: { status: 'success', url: q.imageUrl, cost: log.cost } });
   }
 
   const { error: upErr2 } = await supabase
@@ -406,7 +416,7 @@ async function statusQuery(req, res) {
     catch (_) { /* 返还失败仅记日志 */ }
   }
   await cleanupRefs(log.params?.ref_paths);
-  return res.json({ code: 200, data: { status: 'fail', cost: log.cost } });
+  return c.json({ code: 200, data: { status: 'fail', cost: log.cost } });
 }
 
 // ===================== admin =====================
@@ -420,144 +430,148 @@ async function logOp(adminId, action, targetType, targetId, detail) {
   });
 }
 
-async function listUsers(req, res) {
+async function listUsers(c) {
   const { data, error } = await supabase
     .from('users')
     .select('id, phone, balance, role, status, created_at')
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
-  if (error) return res.status(500).json({ code: 500, msg: error.message });
-  return res.json({ code: 200, data });
+  if (error) return c.json({ code: 500, msg: error.message }, 500);
+  return c.json({ code: 200, data });
 }
 
-async function createUser(req, res) {
-  const { phone, password, balance } = req.body || {};
+async function createUser(c) {
+  const { phone, password, balance } = await c.req.json();
   if (!phone || !password) {
-    return res.status(400).json({ code: 400, msg: '手机号与密码必填' });
+    return c.json({ code: 400, msg: '手机号与密码必填' }, 400);
   }
-  const hash = await bcrypt.hash(password, 10);
+  const hashStr = await hash(password, 10);
   const { data, error } = await supabase
     .from('users')
-    .insert({ phone, password_hash: hash, balance: Number(balance) || 0, role: 'user' })
+    .insert({ phone, password_hash: hashStr, balance: Number(balance) || 0, role: 'user' })
     .select('id, phone, balance')
     .single();
-  if (error) return res.status(400).json({ code: 400, msg: '创建失败：' + error.message });
-  await logOp(req.user.id, 'create_user', 'user', data.id, `创建用户 ${phone}`);
-  return res.json({ code: 200, data });
+  if (error) return c.json({ code: 400, msg: '创建失败：' + error.message }, 400);
+  await logOp(c.get('user').id, 'create_user', 'user', data.id, `创建用户 ${phone}`);
+  return c.json({ code: 200, data });
 }
 
-async function updateUser(req, res) {
-  const id = req.params.id;
-  const { action, password, delta } = req.body || {};
+async function updateUser(c) {
+  const id = c.req.param('id');
+  const { action, password, delta } = await c.req.json();
   const { data: target, error: te } = await supabase
     .from('users')
     .select('id, role, balance, phone')
     .eq('id', id)
     .single();
-  if (te || !target) return res.status(404).json({ code: 404, msg: '用户不存在' });
+  if (te || !target) return c.json({ code: 404, msg: '用户不存在' }, 404);
   if (target.role === 'admin') {
-    return res.status(403).json({ code: 403, msg: '不能修改管理员账号' });
+    return c.json({ code: 403, msg: '不能修改管理员账号' }, 403);
   }
 
   if (action === 'freeze') {
     await supabase.from('users').update({ status: 'frozen' }).eq('id', id);
-    await logOp(req.user.id, 'freeze', 'user', id, `冻结用户 ${target.phone}`);
-    return res.json({ code: 200, data: { ok: true } });
+    await logOp(c.get('user').id, 'freeze', 'user', id, `冻结用户 ${target.phone}`);
+    return c.json({ code: 200, data: { ok: true } });
   }
   if (action === 'unfreeze') {
     await supabase.from('users').update({ status: 'active' }).eq('id', id);
-    await logOp(req.user.id, 'unfreeze', 'user', id, `解冻用户 ${target.phone}`);
-    return res.json({ code: 200, data: { ok: true } });
+    await logOp(c.get('user').id, 'unfreeze', 'user', id, `解冻用户 ${target.phone}`);
+    return c.json({ code: 200, data: { ok: true } });
   }
   if (action === 'reset_pwd') {
-    if (!password) return res.status(400).json({ code: 400, msg: '新密码必填' });
-    const hash = await bcrypt.hash(password, 10);
-    await supabase.from('users').update({ password_hash: hash }).eq('id', id);
-    await logOp(req.user.id, 'reset_pwd', 'user', id, `重置密码 ${target.phone}`);
-    return res.json({ code: 200, data: { ok: true } });
+    if (!password) return c.json({ code: 400, msg: '新密码必填' }, 400);
+    const hashStr = await hash(password, 10);
+    await supabase.from('users').update({ password_hash: hashStr }).eq('id', id);
+    await logOp(c.get('user').id, 'reset_pwd', 'user', id, `重置密码 ${target.phone}`);
+    return c.json({ code: 200, data: { ok: true } });
   }
   if (action === 'adjust_credit') {
     const d = Number(delta);
-    if (!Number.isFinite(d)) return res.status(400).json({ code: 400, msg: 'delta 非法' });
+    if (!Number.isFinite(d)) return c.json({ code: 400, msg: 'delta 非法' }, 400);
     const newBal = target.balance + d;
-    if (newBal < 0) return res.status(400).json({ code: 400, msg: '余额不能为负' });
+    if (newBal < 0) return c.json({ code: 400, msg: '余额不能为负' }, 400);
     await supabase.from('users').update({ balance: newBal }).eq('id', id);
-    await logOp(req.user.id, 'adjust_credit', 'user', id, `调整积分 ${target.phone} ${d >= 0 ? '+' : ''}${d} → ${newBal}`);
-    return res.json({ code: 200, data: { balance: newBal } });
+    await logOp(c.get('user').id, 'adjust_credit', 'user', id, `调整积分 ${target.phone} ${d >= 0 ? '+' : ''}${d} → ${newBal}`);
+    return c.json({ code: 200, data: { balance: newBal } });
   }
-  return res.status(400).json({ code: 400, msg: '未知 action' });
+  return c.json({ code: 400, msg: '未知 action' }, 400);
 }
 
-async function deleteUser(req, res) {
-  const id = req.params.id;
+async function deleteUser(c) {
+  const id = c.req.param('id');
   const { data: target, error: te } = await supabase
     .from('users')
     .select('id, role, phone')
     .eq('id', id)
     .single();
-  if (te || !target) return res.status(404).json({ code: 404, msg: '用户不存在' });
-  if (target.role === 'admin') return res.status(403).json({ code: 403, msg: '不能删除管理员' });
+  if (te || !target) return c.json({ code: 404, msg: '用户不存在' }, 404);
+  if (target.role === 'admin') return c.json({ code: 403, msg: '不能删除管理员' }, 403);
   await supabase.from('users').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  await logOp(req.user.id, 'delete_user', 'user', id, `软删除用户 ${target.phone}`);
-  return res.json({ code: 200, data: { ok: true } });
+  await logOp(c.get('user').id, 'delete_user', 'user', id, `软删除用户 ${target.phone}`);
+  return c.json({ code: 200, data: { ok: true } });
 }
 
-async function listPricing(req, res) {
+async function listPricing(c) {
   const { data, error } = await supabase
     .from('pricing_rules')
     .select('type, cost')
     .order('type');
-  if (error) return res.status(500).json({ code: 500, msg: error.message });
-  return res.json({ code: 200, data });
+  if (error) return c.json({ code: 500, msg: error.message }, 500);
+  return c.json({ code: 200, data });
 }
 
-async function updatePricing(req, res) {
-  const type = req.params.type;
-  const { cost } = req.body || {};
-  const c = Number(cost);
-  if (!Number.isFinite(c) || c < 0) return res.status(400).json({ code: 400, msg: 'cost 非法' });
-  const { error } = await supabase.from('pricing_rules').update({ cost: c }).eq('type', type);
-  if (error) return res.status(400).json({ code: 400, msg: error.message });
-  await logOp(req.user.id, 'update_pricing', 'pricing', type, `计费 ${type} → ${c}`);
-  return res.json({ code: 200, data: { ok: true } });
+async function updatePricing(c) {
+  const type = c.req.param('type');
+  const { cost } = await c.req.json();
+  const cnum = Number(cost);
+  if (!Number.isFinite(cnum) || cnum < 0) return c.json({ code: 400, msg: 'cost 非法' }, 400);
+  const { error } = await supabase.from('pricing_rules').update({ cost: cnum }).eq('type', type);
+  if (error) return c.json({ code: 400, msg: error.message }, 400);
+  await logOp(c.get('user').id, 'update_pricing', 'pricing', type, `计费 ${type} → ${cnum}`);
+  return c.json({ code: 200, data: { ok: true } });
 }
 
-async function listGenLogs(req, res) {
+async function listGenLogs(c) {
   const { data, error } = await supabase
     .from('generation_logs')
     .select('id, task_id, user_id, method, prompt, cost, status, created_at, result_image')
     .order('created_at', { ascending: false })
     .limit(300);
-  if (error) return res.status(500).json({ code: 500, msg: error.message });
-  return res.json({ code: 200, data });
+  if (error) return c.json({ code: 500, msg: error.message }, 500);
+  return c.json({ code: 200, data });
 }
 
-async function listOpLogs(req, res) {
+async function listOpLogs(c) {
   const { data, error } = await supabase
     .from('operation_logs')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(300);
-  if (error) return res.status(500).json({ code: 500, msg: error.message });
-  return res.json({ code: 200, data });
+  if (error) return c.json({ code: 500, msg: error.message }, 500);
+  return c.json({ code: 200, data });
 }
 
-// ===================== express app =====================
+// ===================== hono app =====================
 checkDbConfig();
 
-const app = express();
-app.use(express.json({ limit: '12mb' }));
+const app = new Hono();
 
 let seeded = false;
-app.use(async (req, res, next) => {
+app.use('*', async (c, next) => {
   if (!seeded) {
     seeded = true;
     seedAdmin().catch((e) => console.error('[seed]', e.message));
   }
-  next();
+  await next();
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true, time: Date.now() }));
+app.onError((err, c) => {
+  console.error('[error]', err);
+  return c.json({ code: 500, msg: err.message || '服务器内部错误' }, 500);
+});
+
+app.get('/api/health', (c) => c.json({ ok: true, time: Date.now() }));
 
 app.post('/api/login', login);
 app.get('/api/me', authRequired, me);
@@ -565,16 +579,14 @@ app.post('/api/generate', authRequired, generate);
 app.post('/api/status', authRequired, statusQuery);
 app.post('/api/upload-ref', authRequired, uploadRefHandler);
 
-const adminRouter = express.Router();
-adminRouter.use(authRequired, adminRequired);
-adminRouter.get('/users', listUsers);
-adminRouter.post('/users', createUser);
-adminRouter.put('/users/:id', updateUser);
-adminRouter.delete('/users/:id', deleteUser);
-adminRouter.get('/pricing', listPricing);
-adminRouter.put('/pricing/:type', updatePricing);
-adminRouter.get('/logs/generation', listGenLogs);
-adminRouter.get('/logs/operation', listOpLogs);
-app.use('/api/admin', adminRouter);
+app.use('/api/admin/*', authRequired, adminRequired);
+app.get('/api/admin/users', listUsers);
+app.post('/api/admin/users', createUser);
+app.put('/api/admin/users/:id', updateUser);
+app.delete('/api/admin/users/:id', deleteUser);
+app.get('/api/admin/pricing', listPricing);
+app.put('/api/admin/pricing/:type', updatePricing);
+app.get('/api/admin/logs/generation', listGenLogs);
+app.get('/api/admin/logs/operation', listOpLogs);
 
 export default app;
