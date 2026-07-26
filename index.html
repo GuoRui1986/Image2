@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多米生图平台</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header id="app-header" style="display:none">
+    <div class="brand">多米生图平台</div>
+    <div class="hdr-right">
+      <span id="hdr-role" class="tag"></span>
+      <span>账号 <b id="hdr-phone"></b></span>
+      <span>余额 <b id="hdr-balance">0</b></span>
+      <button id="btn-to-user" class="link">用户端</button>
+      <button id="btn-to-admin" class="link" style="display:none">管理端</button>
+      <button id="btn-logout" class="btn-sm">退出</button>
+    </div>
+  </header>
+
+  <!-- 登录 -->
+  <section id="view-login" class="view">
+    <div class="card login-card">
+      <h2>登录</h2>
+      <label>手机号 <input id="login-phone" type="text" placeholder="如 13800000000" /></label>
+      <label>密码 <input id="login-pwd" type="password" placeholder="密码" /></label>
+      <button id="btn-login" class="btn-primary">登录</button>
+      <div id="login-msg" class="msg"></div>
+    </div>
+  </section>
+
+  <!-- 用户端 -->
+  <section id="view-user" class="view" style="display:none">
+    <div class="layout">
+      <aside class="panel">
+        <h3>生图设置</h3>
+        <label>引擎
+          <select id="sel-engine">
+            <option value="image2">image2（gpt-image-2）</option>
+            <option value="nano">nano（gemini）</option>
+          </select>
+        </label>
+        <label>方式
+          <select id="sel-mode">
+            <option value="t2i">文生图</option>
+            <option value="i2i">图生图</option>
+          </select>
+        </label>
+        <label>提示词（prompt）
+          <textarea id="inp-prompt" rows="4" placeholder="描述你想要的图像…"></textarea>
+        </label>
+
+        <!-- 图生图参考图 -->
+        <div id="ref-zone" style="display:none">
+          <div class="sub">参考图（最多 10 张，上传到临时桶）</div>
+          <input id="inp-ref" type="file" accept="image/*" multiple />
+          <div id="ref-list" class="ref-list"></div>
+        </div>
+
+        <!-- image2 参数 -->
+        <div id="param-image2">
+          <label>尺寸 size
+            <select id="sel-size">
+              <option value="">默认 auto</option>
+              <option value="1024x1024">1024x1024</option>
+              <option value="1792x1024">1792x1024</option>
+              <option value="1024x1792">1024x1792</option>
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+            </select>
+          </label>
+          <label>质量 quality
+            <select id="sel-quality">
+              <option value="">默认</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+          <label class="chk"><input id="chk-oversea" type="checkbox" /> 海外节点（oversea）</label>
+        </div>
+
+        <!-- nano 参数 -->
+        <div id="param-nano" style="display:none">
+          <label>比例 aspect_ratio
+            <select id="sel-aspect">
+              <option value="auto">auto</option>
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+              <option value="21:9">21:9</option>
+            </select>
+          </label>
+          <label>尺寸 image_size
+            <select id="sel-imgsize">
+              <option value="1K">1K</option>
+              <option value="2K">2K</option>
+              <option value="4K">4K</option>
+            </select>
+          </label>
+          <label>模型 model
+            <select id="sel-nano-model">
+              <option value="gemini-3.1-flash-image-preview">gemini-3.1-flash-image-preview</option>
+              <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+              <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview</option>
+            </select>
+          </label>
+        </div>
+
+        <label>数量（1-10，循环生成）
+          <input id="inp-count" type="range" min="1" max="10" value="1" />
+          <span id="count-label">1 张</span>
+        </label>
+        <button id="btn-generate" class="btn-primary">开始生成</button>
+        <div id="gen-msg" class="msg"></div>
+      </aside>
+
+      <main class="panel results">
+        <h3>生成结果</h3>
+        <div id="result-grid" class="result-grid"></div>
+      </main>
+    </div>
+  </section>
+
+  <!-- 管理端 -->
+  <section id="view-admin" class="view" style="display:none">
+    <div class="layout">
+      <nav class="tabs">
+        <button class="tab active" data-tab="users">用户管理</button>
+        <button class="tab" data-tab="pricing">计费规则</button>
+        <button class="tab" data-tab="genlogs">生图记录</button>
+        <button class="tab" data-tab="oplogs">操作日志</button>
+      </nav>
+      <main class="panel">
+        <!-- 用户管理 -->
+        <div id="tab-users" class="tab-panel">
+          <div class="row-between">
+            <h3>用户列表</h3>
+            <button id="btn-newuser" class="btn-sm">新增用户</button>
+          </div>
+          <table id="user-table"><thead><tr>
+            <th>手机号</th><th>角色</th><th>状态</th><th>余额</th><th>操作</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <!-- 计费规则 -->
+        <div id="tab-pricing" class="tab-panel" style="display:none">
+          <h3>计费规则（每次生成扣除积分）</h3>
+          <table id="pricing-table"><thead><tr>
+            <th>方式</th><th>当前积分</th><th>改为</th><th>操作</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <!-- 生图记录 -->
+        <div id="tab-genlogs" class="tab-panel" style="display:none">
+          <h3>生图记录</h3>
+          <table id="genlog-table"><thead><tr>
+            <th>时间</th><th>方式</th><th>prompt</th><th>积分</th><th>状态</th><th>图</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <!-- 操作日志 -->
+        <div id="tab-oplogs" class="tab-panel" style="display:none">
+          <h3>操作日志</h3>
+          <table id="oplog-table"><thead><tr>
+            <th>时间</th><th>动作</th><th>对象</th><th>详情</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- 通用弹窗 -->
+  <div id="modal" class="modal" style="display:none">
+    <div class="modal-box">
+      <div id="modal-body"></div>
+      <div class="modal-foot"><button id="modal-close" class="btn-sm">关闭</button></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

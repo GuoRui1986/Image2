@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生图平台 · 管理端（低保真原型）</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e3e6ea; --soft:#f0f2f5;
+    --text:#1d2330; --muted:#8a92a3; --pri:#3b6df5; --pri-soft:#eaf0ff;
+    --fill:#eef1f5; --ok:#2a9d5a; --run:#d4a017; --fail:#c86a58;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  body{background:var(--bg);color:var(--text);font-size:14px;}
+
+  /* 顶栏 */
+  .topbar{height:52px;background:var(--panel);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;padding:0 20px;gap:12px;}
+  .brand{font-weight:700;font-size:15px;}
+  .brand .tag{font-size:11px;color:var(--muted);font-weight:400;margin-left:6px;}
+  .topbar .spacer{flex:1;}
+  .admin-info{font-size:13px;color:var(--muted);}
+  .admin-info b{color:var(--text);}
+  .logout{margin-left:14px;font-size:13px;color:var(--fail);cursor:pointer;}
+
+  /* 布局 */
+  .layout{display:flex;min-height:calc(100vh - 52px);}
+  .nav{width:200px;background:var(--panel);border-right:1px solid var(--line);padding:14px 10px;flex-shrink:0;}
+  .nav-item{padding:10px 14px;border-radius:8px;color:var(--muted);cursor:pointer;
+    font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:9px;transition:.12s;}
+  .nav-item:hover{background:var(--soft);}
+  .nav-item.active{background:var(--pri-soft);color:var(--pri);font-weight:600;}
+  .nav-ico{font-size:15px;width:18px;text-align:center;}
+
+  .content{flex:1;padding:22px 26px;overflow-y:auto;}
+  .page-title{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:12px;color:var(--muted);margin-bottom:18px;}
+
+  /* 统计卡 */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;}
+  .stat-card .label{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .stat-card .num{font-size:26px;font-weight:700;}
+  .stat-card .num small{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px;}
+  .stat-card .trend{font-size:11px;margin-top:6px;color:var(--ok);}
+  .stat-card .trend.down{color:var(--fail);}
+
+  /* 区块 / 卡片 */
+  .block{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px;}
+  .block-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .block-title .bar{width:3px;height:14px;background:var(--pri);border-radius:2px;}
+
+  /* 按钮 */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;
+    font-size:13px;border:1px solid var(--line);background:var(--panel);cursor:pointer;transition:.12s;}
+  .btn:hover{background:var(--soft);}
+  .btn.primary{background:var(--pri);color:#fff;border-color:var(--pri);}
+  .btn.primary:hover{opacity:.92;}
+  .btn.sm{padding:4px 10px;font-size:12px;}
+  .btn.danger{color:var(--fail);border-color:rgba(200,106,88,.3);}
+  .btn.warn{color:var(--run);border-color:rgba(212,160,23,.3);}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+
+  /* 表单 */
+  .form-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .form-row .label{width:96px;font-size:13px;color:var(--muted);flex-shrink:0;}
+  .input{flex:1;max-width:320px;padding:8px 12px;border:1px solid var(--line);border-radius:7px;
+    font-size:13px;background:var(--panel);color:var(--text);}
+  select.input{max-width:240px;}
+
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);}
+  th{font-size:11.5px;color:var(--muted);font-weight:600;background:var(--soft);}
+  tr:hover td{background:#fafbfc;}
+  .td-muted{color:var(--muted);}
+
+  /* 状态徽标 */
+  .badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:5px;font-weight:600;}
+  .badge.ok{background:rgba(42,157,90,.1);color:var(--ok);}
+  .badge.fail{background:rgba(200,106,88,.08);color:var(--fail);}
+  .badge.run{background:rgba(212,160,23,.12);color:var(--run);}
+  .badge.exp{background:var(--soft);color:var(--muted);}
+  .badge.dis{background:rgba(138,146,163,.12);color:var(--muted);}
+  .badge.role{background:var(--pri-soft);color:var(--pri);}
+
+  /* 缩略图占位 */
+  .thumb{width:46px;height:46px;border-radius:6px;background:var(--fill);display:inline-flex;
+    align-items:center;justify-content:center;font-size:9px;color:var(--muted);border:1px solid var(--line);}
+  .thumb.tiny{width:34px;height:34px;}
+
+  /* 筛选行 */
+  .filter-row{display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;}
+  .filter-item{display:flex;flex-direction:column;gap:5px;}
+  .filter-item .label{font-size:11px;color:var(--muted);}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:5px;}
+
+  /* 弹窗 */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);
+    z-index:999;align-items:center;justify-content:center;}
+  .modal-overlay.show{display:flex;}
+  .modal-card{background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.15);}
+
+  /* 条形（使用统计） */
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .bar-row .name{width:130px;font-size:12.5px;flex-shrink:0;}
+  .bar-track{flex:1;height:22px;background:var(--soft);border-radius:5px;overflow:hidden;
+    display:flex;}
+  .bar-fill{height:100%;border-radius:5px;display:flex;align-items:center;
+    justify-content:flex-end;padding-right:8px;color:#fff;font-size:11px;
+    min-width:0;white-space:nowrap;overflow:hidden;}
+  /* 堆叠条形：image2(蓝) + nano(橙) */
+  .fill-gpt{background:#3b6df5;}
+  .fill-nano{background:#f59e0b;}
+  .bar-row .val{width:70px;text-align:right;font-size:12.5px;color:var(--muted);flex-shrink:0;}
+  /* 图例 */
+  .legend{display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--muted);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+
+  .hidden{display:none;}
+  .note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .rank{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .rank .no{width:22px;height:22px;border-radius:50%;background:var(--soft);display:flex;
+    align-items:center;justify-content:center;font-size:11px;color:var(--muted);flex-shrink:0;}
+  .rank .no.top{background:var(--pri);color:#fff;}
+  .rank .who{flex:1;font-size:13px;}
+  .rank .score{font-size:13px;font-weight:600;}
+</style>
+</head>
+<body>
+
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <div class="brand">🎨 生图平台 <span class="tag">管理端 · 低保真原型</span></div>
+    <div class="spacer"></div>
+    <div class="admin-info">管理员：<b>138****0000</b></div>
+    <span class="logout">退出</span>
+  </div>
+
+  <div class="layout">
+    <!-- 左侧导航 -->
+    <div class="nav" id="nav">
+      <div class="nav-item active" data-page="dash"><span class="nav-ico">📊</span>仪表盘</div>
+      <div class="nav-item" data-page="accounts"><span class="nav-ico">👤</span>账户管理</div>
+      <div class="nav-item" data-page="credits"><span class="nav-ico">💰</span>积分管理</div>
+      <div class="nav-item" data-page="pricing"><span class="nav-ico">🏷️</span>计费规则</div>
+      <div class="nav-item" data-page="records"><span class="nav-ico">🖼️</span>生图记录</div>
+      <div class="nav-item" data-page="logs"><span class="nav-ico">📝</span>操作日志</div>
+      <div class="nav-item" data-page="stats"><span class="nav-ico">📈</span>使用统计</div>
+    </div>
+
+    <!-- 右侧内容 -->
+    <div class="content">
+
+      <!-- ====== 仪表盘 ====== -->
+      <div class="page" id="page-dash">
+        <div class="page-title">仪表盘</div>
+        <div class="page-sub">平台整体概览（数据每日更新）</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">总消耗积分</div><div class="num">8,640<small>分</small></div><div class="trend">▲ 本周 +1,280</div></div>
+          <div class="stat-card"><div class="label">累计生成</div><div class="num">1,008<small>次</small></div><div class="trend">▲ 本周 +152</div></div>
+          <div class="stat-card"><div class="label">活跃用户</div><div class="num">3<small>/3 人</small></div><div class="trend">全员在用</div></div>
+          <div class="stat-card"><div class="label">本月失败率</div><div class="num">2.1<small>%</small></div><div class="trend down">▼ 较上月 -0.8%</div></div>
+        </div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>近 7 日生成趋势</div>
+          <div class="legend">
+            <span><span style="display:inline-block;width:12px;height:12px;background:#3b6df5;border-radius:3px;"></span> GPT Image 2</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:3px;"></span> Nano Banana</span>
+          </div>
+          <!-- 堆叠条形：每根柱分 image2(蓝) + nano(橙) -->
+          <div class="bar-row"><div class="name">7-19 周一</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:33%">18</div><div class="bar-fill fill-nano" style="width:55%">30</div></div><div class="val">48 次</div></div>
+          <div class="bar-row"><div class="name">7-20 周二</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:40%">25</div><div class="bar-fill fill-nano" style="width:59%">37</div></div><div class="val">62 次</div></div>
+          <div class="bar-row"><div class="name">7-21 周三</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:35%">22</div><div class="bar-fill fill-nano" style="width:52%">33</div></div><div class="val">55 次</div></div>
+          <div class="bar-row"><div class="name">7-22 周四</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:50%">40</div><div class="bar-fill fill-nano" style="width:50%">40</div></div><div class="val">80 次</div></div>
+          <div class="bar-row"><div class="name">7-23 周五</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:58%">55</div><div class="bar-fill fill-nano" style="width:42%">40</div></div><div class="val">95 次</div></div>
+          <div class="bar-row"><div class="name">7-24 周六</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:18%">9</div><div class="bar-fill fill-nano" style="width:43%">21</div></div><div class="val">30 次</div></div>
+          <div class="bar-row"><div class="name">7-25 周日</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:26%">15</div><div class="bar-fill fill-nano" style="width:45%">26</div></div><div class="val">41 次</div></div>
+        </div>
+      </div>
+
+      <!-- ====== 账户管理 ====== -->
+      <div class="page hidden" id="page-accounts">
+        <div class="page-title">账户管理</div>
+        <div class="page-sub">创建内部账户、管理状态与权限（账户由管理员创建，无自注册）</div>
+        <div class="btn-row" style="margin-bottom:16px;">
+          <button class="btn primary" onclick="document.getElementById('createBox').classList.toggle('hidden')">＋ 创建账户</button>
+        </div>
+        <div class="block hidden" id="createBox">
+          <div class="block-title"><span class="bar"></span>新建账户</div>
+          <div class="form-row"><div class="label">手机号</div><input class="input" placeholder="11 位手机号"></div>
+          <div class="form-row"><div class="label">密码</div><input class="input" type="password" placeholder="设置登录密码"></div>
+          <div class="form-row"><div class="label">确认密码</div><input class="input" type="password" placeholder="再次输入密码"></div>
+          <div class="form-row"><div class="label">角色</div>
+            <select class="input"><option>普通用户（user）</option><option>管理员（admin）</option></select>
+          </div>
+          <div class="btn-row"><button class="btn primary">确认创建</button><button class="btn" onclick="document.getElementById('createBox').classList.add('hidden')">取消</button></div>
+        </div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>账户列表 <span class="td-muted" style="font-weight:400;margin-left:6px;">共 3 人</span></div>
+          <table>
+            <thead><tr><th>手机号</th><th>角色</th><th>状态</th><th>剩余积分</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>138****0001</td><td><span class="badge role">user</span></td><td><span class="badge ok">正常</span></td>
+                <td>3,200</td><td>2026-07-01</td>
+                <td class="btn-row">
+                  <button class="btn sm warn">冻结</button>
+                  <button class="btn sm">重置密码</button>
+                  <button class="btn sm danger">删除</button>
+                </td>
+              </tr>
+              <tr>
+                <td>138****0002</td><td><span class="badge role">user</span></td><td><span class="badge dis">已冻结</span></td>
+                <td>1,050</td><td>2026-07-03</td>
+                <td class="btn-row">
+                  <button class="btn sm primary">启用</button>
+                  <button class="btn sm">重置密码</button>
+                  <button class="btn sm danger">删除</button>
+                </td>
+              </tr>
+              <tr>
+                <td>138****0000</td><td><span class="badge role">admin</span></td><td><span class="badge ok">正常</span></td>
+                <td>∞</td><td>2026-06-28</td>
+                <td class="btn-row">
+                  <button class="btn sm" disabled>重置密码</button>
+                  <button class="btn sm danger" disabled>删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="note">管理员账号不可冻结/删除；冻结后该用户无法登录与生图，积分保留。</div>
+        </div>
+      </div>
+
+      <!-- ====== 积分管理 ====== -->
+      <div class="page hidden" id="page-credits">
+        <div class="page-title">积分管理</div>
+        <div class="page-sub">为账户充值或扣减积分（内部虚拟额度，操作留痕于操作日志）</div>
+        <div class="block">
+          <table>
+            <thead><tr><th>账户</th><th>剩余积分</th><th>本月已消耗</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>138****0001</td><td>3,200</td><td>680</td><td><button class="btn sm primary" onclick="openAdjust('138****0001',3200)">调整</button></td></tr>
+              <tr><td>138****0002</td><td>1,050</td><td>1,950</td><td><button class="btn sm primary" onclick="openAdjust('138****0002',1050)">调整</button></td></tr>
+              <tr><td>138****0000（管理员）</td><td>∞</td><td>—</td><td><span class="td-muted">—</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 调整积分弹窗 -->
+      <div class="modal-overlay" id="adjustModal" onclick="if(event.target===this)closeAdjust()">
+        <div class="modal-card" style="width:440px;">
+          <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-weight:600;font-size:15px;">调整积分</div>
+            <span style="cursor:pointer;font-size:20px;color:var(--muted);" onclick="closeAdjust()">✕</span>
+          </div>
+          <div style="padding:20px 22px;">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">当前操作：<strong id="adjTarget" style="color:var(--text);font-size:13px;"></strong>（剩余 <strong id="adjCurrent" style="color:var(--pri);"></strong> 分）</div>
+            <div class="form-row"><div class="label">操作类型</div>
+              <select class="input"><option>充值（增加）</option><option>扣减（减少）</option></select>
+            </div>
+            <div class="form-row"><div class="label">数额</div><input class="input" placeholder="输入积分数量，如 500" style="max-width:220px;"></div>
+            <div class="form-row"><div class="label">备注</div><input class="input" placeholder="选填，如「7月额度」"></div>
+            <div class="btn-row" style="margin-top:6px;">
+              <button class="btn primary" onclick="closeAdjust()">确认调整</button>
+              <button class="btn" onclick="closeAdjust()">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 计费规则 ====== -->
+      <div class="page hidden" id="page-pricing">
+        <div class="page-title">计费规则</div>
+        <div class="page-sub">设置每种生图方式消耗的积分（4 种方式独立配置）</div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>生图方式 → 扣分设置</div>
+          <table>
+            <thead><tr><th>生图方式</th><th>引擎</th><th>每次扣分</th><th>说明</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>image2 文生图</td><td><span class="td-muted">GPT Image 2</span></td>
+                <td><input class="input" value="10" style="max-width:90px;"></td>
+                <td class="td-muted">真实成本约 ¥0.04/次</td>
+                <td><button class="btn sm primary">保存</button></td>
+              </tr>
+              <tr>
+                <td>image2 图生图</td><td><span class="td-muted">GPT Image 2</span></td>
+                <td><input class="input" value="12" style="max-width:90px;"></td>
+                <td class="td-muted">带参考图，略高于文生图</td>
+                <td><button class="btn sm primary">保存</button></td>
+              </tr>
+              <tr>
+                <td>nano 文生图</td><td><span class="td-muted">Nano Banana</span></td>
+                <td><input class="input" value="10" style="max-width:90px;"></td>
+                <td class="td-muted">真实成本约 ¥0.07/次</td>
+                <td><button class="btn sm primary">保存</button></td>
+              </tr>
+              <tr>
+                <td>nano 图生图</td><td><span class="td-muted">Nano Banana</span></td>
+                <td><input class="input" value="14" style="max-width:90px;"></td>
+                <td class="td-muted">支持多张参考图（最多10张）</td>
+                <td><button class="btn sm primary">保存</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="note">仅生图成功后扣减积分；失败不扣分。修改后即时生效，并写入操作日志。</div>
+        </div>
+      </div>
+
+      <!-- ====== 生图记录 ====== -->
+      <div class="page hidden" id="page-records">
+        <div class="page-title">生图记录</div>
+        <div class="page-sub">查看全部用户的生图记录与积分消耗（结果图仅存 URL，约 5 天过期）</div>
+        <div class="filter-row">
+          <div class="filter-item"><span class="label">用户</span>
+            <select class="input"><option>全部用户</option><option>138****0001</option><option>138****0002</option></select>
+          </div>
+          <div class="filter-item"><span class="label">生图方式</span>
+            <select class="input"><option>全部方式</option><option>image2 文生图</option><option>image2 图生图</option><option>nano 文生图</option><option>nano 图生图</option></select>
+          </div>
+          <div class="filter-item"><span class="label">状态</span>
+            <select class="input"><option>全部状态</option><option>成功</option><option>失败</option><option>已过期</option></select>
+          </div>
+          <div class="filter-item"><span class="label">时间</span>
+            <select class="input"><option>最近 7 天</option><option>最近 30 天</option><option>全部</option></select>
+          </div>
+          <button class="btn primary">筛选</button>
+          <button class="btn">导出</button>
+        </div>
+        <div class="block">
+          <table>
+            <thead><tr><th>用户</th><th>方式</th><th>提示词</th><th>参考图</th><th>结果图</th><th>扣分</th><th>状态</th><th>时间</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>138****0001</td><td class="td-muted">nano 文生图</td>
+                <td style="max-width:200px;" class="td-muted">白色背景电商产品摄影风格红色苹果，柔和自然光…</td>
+                <td><span class="td-muted">—</span></td>
+                <td><span class="thumb">图</span></td>
+                <td>-10</td><td><span class="badge ok">成功</span></td><td class="td-muted">07-25 14:20</td>
+              </tr>
+              <tr>
+                <td>138****0002</td><td class="td-muted">image2 图生图</td>
+                <td style="max-width:200px;" class="td-muted">更换背景为蓝色天空，保持主体，电商质感…</td>
+                <td><span class="thumb tiny">参</span></td>
+                <td><span class="thumb">图</span></td>
+                <td>-12</td><td><span class="badge ok">成功</span></td><td class="td-muted">07-25 11:05</td>
+              </tr>
+              <tr>
+                <td>138****0001</td><td class="td-muted">nano 图生图</td>
+                <td style="max-width:200px;" class="td-muted">多元素融合：将参考图 A 的商品放入参考图 B 场景…</td>
+                <td><span class="thumb tiny">参×3</span></td>
+                <td><span class="thumb" style="opacity:.4">过期</span></td>
+                <td>-14</td><td><span class="badge exp">已过期</span></td><td class="td-muted">07-18 09:40</td>
+              </tr>
+              <tr>
+                <td>138****0002</td><td class="td-muted">nano 文生图</td>
+                <td style="max-width:200px;" class="td-muted">高清微距产品细节图…</td>
+                <td><span class="td-muted">—</span></td>
+                <td><span class="td-muted">无</span></td>
+                <td>0</td><td><span class="badge fail">失败</span></td><td class="td-muted">07-25 08:12</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="note">「参考图」列仅图生图有值（参考图托管方式待定：粘贴 URL 或临时桶）；「已过期」表示多米返回的 URL 超过 5 天失效。</div>
+        </div>
+      </div>
+
+      <!-- ====== 操作日志 ====== -->
+      <div class="page hidden" id="page-logs">
+        <div class="page-title">操作日志</div>
+        <div class="page-sub">账户与积分相关操作的留痕（只读）</div>
+        <div class="block">
+          <table>
+            <thead><tr><th>时间</th><th>管理员</th><th>动作</th><th>对象</th><th>详情</th></tr></thead>
+            <tbody>
+              <tr><td class="td-muted">07-25 10:30</td><td>138****0000</td><td>充值积分</td><td>138****0001</td><td class="td-muted">+500（备注：7月额度）</td></tr>
+              <tr><td class="td-muted">07-24 16:10</td><td>138****0000</td><td>修改计费</td><td>计费规则</td><td class="td-muted">nano 图生图 10 → 14</td></tr>
+              <tr><td class="td-muted">07-23 09:02</td><td>138****0000</td><td>冻结账户</td><td>138****0002</td><td class="td-muted">原因：暂离项目</td></tr>
+              <tr><td class="td-muted">07-22 14:45</td><td>138****0000</td><td>创建账户</td><td>138****0002</td><td class="td-muted">角色 user</td></tr>
+              <tr><td class="td-muted">07-22 14:44</td><td>138****0000</td><td>创建账户</td><td>138****0001</td><td class="td-muted">角色 user</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ====== 使用统计 ====== -->
+      <div class="page hidden" id="page-stats">
+        <div class="page-title">使用统计</div>
+        <div class="page-sub">消耗与用量分析（只读）</div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">总消耗</div><div class="num">8,640<small>分</small></div></div>
+          <div class="stat-card"><div class="label">总生成次数</div><div class="num">1,008<small>次</small></div></div>
+          <div class="stat-card"><div class="label">平均单次成本</div><div class="num">8.6<small>分</small></div></div>
+          <div class="stat-card"><div class="label">成功 / 失败</div><div class="num">986 / 22</div></div>
+        </div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>各生图方式使用量</div>
+          <div class="bar-row"><div class="name">nano 文生图</div><div class="bar-track"><div class="bar-fill" style="width:88%">440 次</div></div><div class="val">4,400 分</div></div>
+          <div class="bar-row"><div class="name">image2 文生图</div><div class="bar-track"><div class="bar-fill" style="width:64%">320 次</div></div><div class="val">3,200 分</div></div>
+          <div class="bar-row"><div class="name">nano 图生图</div><div class="bar-track"><div class="bar-fill" style="width:32%">160 次</div></div><div class="val">2,240 分</div></div>
+          <div class="bar-row"><div class="name">image2 图生图</div><div class="bar-track"><div class="bar-fill" style="width:18%">88 次</div></div><div class="val">1,056 分</div></div>
+        </div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>各用户消耗排名</div>
+          <div class="rank"><div class="no top">1</div><div class="who">138****0001</div><div class="score">4,860 分</div></div>
+          <div class="rank"><div class="no top">2</div><div class="who">138****0002</div><div class="score">3,780 分</div></div>
+        </div>
+        <div class="note">消耗排名仅统计有消耗的内部用户（管理员不计费）。</div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  // 菜单切换
+  const nav = document.getElementById('nav');
+  nav.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('click',()=>{
+      nav.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+      item.classList.add('active');
+      document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+      document.getElementById('page-'+item.dataset.page).classList.remove('hidden');
+    });
+  });
+
+  // 调整积分弹窗
+  function openAdjust(phone, current){
+    document.getElementById('adjTarget').textContent = phone;
+    document.getElementById('adjCurrent').textContent = current.toLocaleString();
+    document.getElementById('adjustModal').classList.add('show');
+  }
+  function closeAdjust(){
+    document.getElementById('adjustModal').classList.remove('show');
+  }
+</script>
+</body>
+</html>

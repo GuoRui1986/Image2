@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用户端 · 低保真原型 V2</title>
+<style>
+  :root{
+    --line:#d0d5db; --fill:#f0f2f5; --text:#1a1a1a; --muted:#8b9299;
+    --ln:#c8cdd3; --soft:#f7f8fa; --pri:#e85a0a; --pri-bg:#fff6ed;
+    --ok:#2a9d5a; --run:#d4a017;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;background:#fff;color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ====== 顶栏 ====== */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-bottom:1px solid var(--line);background:#fff;flex:none;height:52px;}
+  .topbar .brand{font-size:15px;font-weight:700;letter-spacing:.3px;}
+  .topbar .right{display:flex;align-items:center;gap:16px;font-size:13px;}
+  .topbar .phone{color:var(--muted);}
+  .topbar .pts{font-weight:600;color:var(--pri);}
+  .topbar .logout{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:4px 14px;cursor:pointer;background:none;}
+
+  /* ====== 主区域：左右分栏 ====== */
+  .main{display:flex;flex:1;overflow:hidden;}
+
+  /* ---- 左侧操作区 ---- */
+  .left-panel{
+    width:420px;min-width:420px;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;overflow-y:auto;
+    background:#fafbfc;padding:20px 22px;gap:0;
+  }
+  .left-panel::-webkit-scrollbar{width:4px;}
+  .left-panel::-webkit-scrollbar-thumb{background:var(--ln);border-radius:3px;}
+
+  /* 文生图/图生图 小Tab */
+  .mode-tabs{display:flex;gap:0;margin-bottom:18px;}
+  .mode-tab{
+    font-size:12px;padding:5px 14px;border:1px solid var(--line);
+    border-radius:5px 5px 0 0;cursor:pointer;color:var(--muted);
+    background:var(--soft);margin-right:-1px;
+  }
+  .mode-tab.active{background:#fff;color:var(--text);border-bottom-color:#fff;font-weight:600;z-index:1;}
+
+  /* 区块标题 */
+  .sec-title{font-size:12px;color:var(--muted);font-weight:600;margin:14px 0 8px;letter-spacing:.3px;text-transform:uppercase;}
+  .sec-title:first-child{margin-top:0;}
+
+  /* 模型选择 - 按钮组 */
+  .model-group{display:flex;gap:10px;}
+  .model-btn{
+    flex:1;padding:9px 0;text-align:center;font-size:13px;
+    border:1.5px solid var(--line);border-radius:7px;cursor:pointer;
+    background:#fff;color:var(--muted);transition:all .15s;
+  }
+  .model-btn.active{border-color:var(--pri);color:var(--pri);background:var(--pri-bg);font-weight:600;}
+  .model-btn:hover:not(.active){border-color:#b0b7bf;}
+
+  /* 输入框 */
+  .input-wrap{position:relative;}
+  .textarea{
+    width:100%;min-height:110px;padding:10px 36px 10px 12px;
+    border:1.5px solid var(--line);border-radius:7px;font-size:13px;
+    resize:vertical;font-family:inherit;line-height:1.55;color:var(--text);
+    background:#fff;outline:none;transition:border-color .15s;
+  }
+  .textarea:focus{border-color:var(--pri);}
+  .textarea::placeholder{color:#bbb;}
+  .translate-hint{position:absolute;top:8px;right:10px;font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:3px;}
+  .hint-text{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
+
+  /* 普通输入框 */
+  .input{
+    width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:7px;
+    font-size:13px;background:#fff;outline:none;color:var(--text);
+  }
+  .input:focus{border-color:var(--pri);}
+
+  /* 上传区 */
+  .upload-zone{
+    border:2px dashed var(--ln);border-radius:8px;padding:28px 16px;
+    text-align:center;cursor:pointer;background:#fff;transition:border-color .15s;
+  }
+  .upload-zone:hover{border-color:var(--pri);}
+  .upload-icon{font-size:28px;margin-bottom:6px;}
+  .upload-text{font-size:13px;color:var(--muted);}
+  .upload-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+
+  /* 下拉行 */
+  .select-row{display:flex;align-items:center;gap:10px;}
+  .select-row .label{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .select{
+    flex:1;padding:8px 10px;border:1.5px solid var(--line);border-radius:7px;
+    font-size:13px;background:#fff;color:var(--text);outline:none;
+  }
+
+  /* 预设比例标签 */
+  .preset-tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .preset-tag{
+    font-size:11px;padding:3px 10px;border:1px solid var(--line);border-radius:4px;
+    cursor:pointer;color:var(--muted);background:#fff;
+  }
+  .preset-tag:hover,.preset-tag.active{border-color:var(--pri);color:var(--pri);}
+
+  /* 数量滑块 */
+  .slider-row{display:flex;align-items:center;gap:12px;}
+  .slider{flex:1;-webkit-appearance:none;height:4px;background:var(--line);border-radius:2px;outline:none;}
+  .slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--pri);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+  .slider-val{font-size:15px;font-weight:700;color:var(--text);min-width:24px;text-align:center;}
+
+  /* 节点切换 */
+  .node-row{display:flex;gap:6px;}
+  .node-btn{
+    padding:6px 14px;font-size:12px;border:1px solid var(--line);border-radius:5px;
+    cursor:pointer;color:var(--muted);background:#fff;
+  }
+  .node-btn.active{background:var(--text);color:#fff;border-color:var(--text);}
+
+  /* 提交按钮 */
+  .submit-btn{
+    width:100%;padding:12px;font-size:15px;font-weight:600;
+    border:none;border-radius:8px;cursor:pointer;
+    background:linear-gradient(135deg,#e85a0a,#ff7a2e);color:#fff;
+    margin-top:6px;transition:opacity .15s;
+  }
+  .submit-btn:hover{opacity:.9;}
+  .submit-btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* ---- 右侧结果区 ---- */
+  .right-panel{
+    flex:1;display:flex;flex-direction:column;overflow:hidden;
+    background:#fcfdfe;
+  }
+
+  /* 结果头部 */
+  .result-header{padding:14px 24px 10px;border-bottom:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:space-between;flex:none;}
+  .result-header h3{font-size:14px;font-weight:600;}
+  .result-header .count{font-size:12px;color:var(--muted);}
+
+  /* 结果内容 */
+  .result-body{flex:1;overflow-y:auto;padding:24px;display:flex;align-items:flex-start;justify-content:flex-start;gap:16px;flex-wrap:wrap;align-content:flex-start;}
+  .result-body::-webkit-scrollbar{width:5px;}
+  .result-body::-webkit-scrollbar-thumb{background:var(--ln);border-radius:3px;}
+
+  /* 空状态 */
+  .empty-state{
+    width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding-top:15vh;color:var(--muted);
+  }
+  .empty-icon{font-size:64px;margin-bottom:14px;}
+  .empty-title{font-size:17px;font-weight:600;margin-bottom:6px;color:var(--text);}
+  .empty-desc{font-size:13px;}
+
+  /* 结果卡片 */
+  .result-card{
+    width:220px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;overflow:hidden;transition:box-shadow .15s,transform .1s;
+  }
+  .result-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-2px);}
+  .result-img{
+    width:100%;height:220px;background:var(--fill);display:flex;
+    align-items:center;justify-content:center;font-size:11px;color:var(--muted);
+    border-bottom:1px solid var(--line);position:relative;overflow:hidden;
+  }
+  .result-img .status-badge{
+    position:absolute;top:8px;left:8px;font-size:10px;padding:2px 8px;
+    border-radius:4px;font-weight:600;
+  }
+  .status-gen{background:rgba(212,160,23,.12);color:var(--run);border:1px solid rgba(212,160,23,.3);}
+  .status-ok{background:rgba(42,157,90,.08);color:var(--ok);border:1px solid rgba(42,157,90,.2);}
+  .status-fail{background:rgba(200,100,80,.06);color:#c86a58;border:1px solid rgba(200,100,80,.2);}
+  .result-info{padding:10px 12px;}
+  .result-prompt{
+    font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    cursor:pointer;position:relative;padding-right:40px;
+  }
+  /* 截断时右下角"展开"提示 */
+  .result-prompt::after{
+    content:'展开';position:absolute;right:0;bottom:0;font-size:10px;
+    color:var(--pri);background:linear-gradient(90deg,transparent 50%,#fff 70%);
+    padding-left:8px;font-weight:600;
+  }
+  .result-prompt:hover{color:var(--text);}
+  /* hover tooltip — 完整提示词浮层 */
+  .result-prompt .tip{
+    display:none;position:absolute;left:0;top:100%;z-index:20;
+    background:#1a1a2e;color:#e8e8e8;border-radius:8px;padding:12px 14px;
+    font-size:12px;line-height:1.65;white-space:normal;width:340px;max-height:200px;
+    overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.2);margin-top:4px;
+    -webkit-line-clamp:unset;
+  }
+  .result-prompt:hover .tip{display:block;}
+
+  /* ====== 卡片详情弹窗（点击卡片弹出） ====== */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;
+    display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;
+    transition:opacity .2s;
+  }
+  .modal-overlay.show{opacity:1;pointer-events:auto;}
+  .modal-card{
+    width:560px;border-radius:14px;background:#fff;overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.2);transform:translateY(16px);transition:transform .2s;
+  }
+  .modal-overlay.show .modal-card{transform:translateY(0);}
+  .modal-img{
+    width:100%;height:360px;display:flex;align-items:center;justify-content:center;
+    font-size:48px;background:var(--fill);border-bottom:1px solid var(--line);
+  }
+  .modal-body{padding:20px 24px;}
+  .modal-body h4{font-size:13px;margin-bottom:8px;}
+  .modal-prompt{
+    background:var(--soft);border:1px solid var(--line);border-radius:8px;
+    padding:14px 16px;font-size:13px;line-height:1.7;color:var(--text);
+    max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
+  }
+  .modal-meta{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;
+  }
+  .modal-meta-item{
+    font-size:12px;color:var(--muted);padding:8px 12px;background:var(--soft);border-radius:6px;
+  }
+  .modal-meta-item b{color:var(--text);}
+  .modal-close{
+    position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;
+    border:none;background:rgba(0,0,0,.35);color:#fff;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;z-index:3;
+  }
+  .result-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);}
+  .result-dl{
+    font-size:11px;padding:4px 12px;color:var(--pri);border:1px solid rgba(232,90,10,.25);
+    border-radius:4px;cursor:pointer;background:rgba(232,90,10,.04);text-align:center;width:100%;
+    margin-top:6px;font-weight:500;
+  }
+  .result-dl:hover{background:rgba(232,90,10,.1);}
+
+  /* 加载动画占位 */
+  @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
+  .loading-dot{animation:pulse 1.4s ease-in-out infinite;}
+
+  /* ====== 登录页（覆盖层） ====== */
+  .login-overlay{
+    position:fixed;inset:0;background:#fff;z-index:100;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .login-card{
+    width:360px;border:1px solid var(--line);border-radius:12px;
+    padding:32px 28px;background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.06);
+  }
+  .login-card h2{text-align:center;font-size:18px;margin-bottom:24px;font-weight:700;}
+  .login-card .field{margin-bottom:16px;}
+  .login-card label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;font-weight:600;}
+  .login-card .input{border-color:var(--ln);}
+  .login-btn{
+    width:100%;padding:11px;font-size:15px;font-weight:600;
+    border:none;border-radius:8px;cursor:pointer;background:var(--text);color:#fff;margin-top:4px;
+  }
+  .login-note{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;}
+
+  /* ====== 个人中心（右侧面板内切换） ====== */
+  .profile-panel{display:none;flex:1;flex-direction:column;overflow:hidden;}
+  .profile-panel.active{display:flex;}
+  .profile-header{padding:14px 24px 10px;border-bottom:1px solid var(--line);background:#fff;flex:none;}
+  .profile-header h3{font-size:14px;font-weight:600;}
+  .profile-body{flex:1;overflow-y:auto;padding:24px;}
+  .pts-card{
+    background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;
+    padding:24px;color:#fff;text-align:center;margin-bottom:24px;
+  }
+  .pts-card .num{font-size:42px;font-weight:800;}
+  .pts-card .lbl{font-size:13px;opacity:.7;margin-top:4px;}
+  .hist-item{
+    display:flex;gap:12px;align-items:center;padding:12px;
+    border:1px solid var(--line);border-radius:8px;margin-bottom:10px;background:#fff;
+  }
+  .hist-item .thumb{width:56px;height:56px;border-radius:6px;background:var(--fill);border:1px dashed var(--ln);flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);}
+  .hist-item .info{flex:1;font-size:12px;color:var(--muted);line-height:1.6;}
+  .hist-item .info b{color:var(--text);font-size:13px;}
+
+  /* 右侧视图切换 tab */
+  .view-tabs{display:flex;gap:0;margin-left:auto;}
+  .view-tab{font-size:12px;padding:6px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;}
+  .view-tab.active{color:var(--text);border-bottom-color:var(--pri);font-weight:600;}
+
+  /* 隐藏类 */
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<!-- ============ 登录页 ============ -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h2>内部生图工具</h2>
+    <div class="field"><label>手机号</label><input class="input" placeholder="请输入手机号" value="138****0001"></div>
+    <div class="field"><label>密码</label><input class="input" type="password" placeholder="请输入密码" value="********"></div>
+    <button class="login-btn" onclick="document.getElementById('loginOverlay').style.display='none'">登 录</button>
+    <div class="login-note">账户由管理端创建 · 无注册入口</div>
+  </div>
+</div>
+
+<!-- ============ 顶栏 ============ -->
+<div class="topbar">
+  <span class="brand">AI 生图工具</span>
+  <div class="right">
+    <span class="phone">138****0001</span>
+    <span class="pts">剩余积分：<b>820</b></span>
+    <button class="logout">登出</button>
+  </div>
+</div>
+
+<!-- ============ 主区域 ============ -->
+<div class="main">
+
+  <!-- ===== 左侧操作区 ===== -->
+  <div class="left-panel">
+
+    <!-- 文生图 / 图生图 切换 -->
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="t2i" onclick="switchMode('t2i')">文生图</div>
+      <div class="mode-tab" data-mode="i2i" onclick="switchMode('i2i')">图生图</div>
+    </div>
+
+    <!-- === 文生图表单 === -->
+    <div id="form-t2i">
+
+      <!-- 选择模型 -->
+      <div class="sec-title">选择模型</div>
+      <div class="model-group">
+        <div class="model-btn active" data-m="gpt" onclick="selModel(this)">GPT Image 2</div>
+        <div class="model-btn" data-m="nano" onclick="selModel(this)">Gemini 3.1 Flash</div>
+        <div class="model-btn" data-m="pro" onclick="selModel(this)">Gemini 3 Pro</div>
+      </div>
+
+      <!-- Prompt -->
+      <div class="sec-title">提示词</div>
+      <div class="input-wrap">
+        <textarea class="textarea" placeholder="描述你想要对图片进行的修改...&#10;&#10;例如：白色背景上的红色苹果，电商产品摄影风格，柔和光影"></textarea>
+        <span class="translate-hint">✦ 翻译</span>
+      </div>
+      <div class="hint-text">提示：使用中文描述，系统自动翻译为英文；点击右上角翻译按钮可切换中英文</div>
+
+      <!-- 图生图专属：上传参考图（默认隐藏） -->
+      <div id="refImgSec" class="hidden">
+        <div class="sec-title">上传参考图片 <span style="color:var(--pri);font-weight:normal;">(最多10张)</span></div>
+        <div class="upload-zone">
+          <div class="upload-icon">📤</div>
+          <div class="upload-text">点击或拖拽图片到此处上传</div>
+          <div class="upload-sub">支持拖拽批量上传 · 最多上传10张参考图片</div>
+        </div>
+      </div>
+
+      <!-- 图片比例 -->
+      <div class="sec-title">图片比例</div>
+      <div class="select-row">
+        <span class="label">预设比例</span>
+        <select class="select">
+          <option>1 : 1</option>
+          <option>1 : 2</option>
+          <option>3 : 4</option>
+          <option>4 : 3</option>
+          <option>16 : 9</option>
+          <option>9 : 16</option>
+        </select>
+      </div>
+      <div class="hint-text">预设比例均为 1K 清晰度</div>
+
+      <!-- 分辨率 (nano专用) -->
+      <div class="sec-title" id="resTitle">分辨率</div>
+      <div class="select-row" id="resRow">
+        <span class="label">清晰度</span>
+        <select class="select">
+          <option>1K (1024)</option>
+          <option>2K (2048)</option>
+          <option>4K (4096)</option>
+        </select>
+      </div>
+
+      <!-- 生成数量 -->
+      <div class="sec-title">生成数量 <span style="color:var(--muted);font-weight:normal;">(最多10张)</span></div>
+      <div class="slider-row">
+        <input type="range" class="slider" min="1" max="10" value="1" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="slider-val">1</span>
+      </div>
+
+      <!-- 节点切换 -->
+      <div class="sec-title">节点</div>
+      <div class="node-row">
+        <div class="node-btn active">海外节点（推荐）</div>
+        <div class="node-btn">国内节点</div>
+      </div>
+
+      <!-- 提交 -->
+      <button class="submit-btn" style="margin-top:18px;">开始生成</button>
+    </div>
+
+  </div><!-- /左面板 -->
+
+  <!-- ===== 右侧结果区 ===== -->
+  <div class="right-panel" id="resultPanel">
+    <div class="result-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h3>生成结果</h3>
+        <span class="count">共 3 张</span>
+      </div>
+      <div class="view-tabs">
+        <div class="view-tab active" onclick="switchView('results',this)">生成结果</div>
+        <div class="view-tab" onclick="switchView('profile',this)">我的历史</div>
+      </div>
+    </div>
+
+    <!-- 生成结果网格 -->
+    <div class="result-body" id="resultsBody">
+
+      <!-- 卡片1：成功（长prompt示例） -->
+      <div class="result-card" onclick="openDetail(this)">
+        <div class="result-img" style="background:linear-gradient(135deg,#fef3e8,#fce4cc);">
+          <span class="status-badge status-ok">已完成</span> 🍎 预览图
+        </div>
+        <div class="result-info">
+          <div class="result-prompt">
+            白色背景上的红色苹果，电商产品摄影风格，柔和光影
+            <span class="tip">白色背景上的红色苹果，新鲜饱满，表面带有自然水珠反光，电商产品摄影风格，柔和的影棚灯光从左上方45度角照射，背景为纯白#FFFFFF，高分辨率，8K画质，商业级精修，适合淘宝/京东主图使用，构图居中，主体突出，色彩鲜艳饱和度高</span>
+          </div>
+          <div class="result-meta"><span>nano · 1:1 · 1K</span><span>-10分</span></div>
+          <div class="result-dl" onclick="event.stopPropagation()">下载</div>
+        </div>
+      </div>
+
+      <!-- 卡片2：成功（超长prompt） -->
+      <div class="result-card" onclick="openDetail(this)">
+        <div class="result-img" style="background:linear-gradient(135deg,#e8f0fe,#d4e4fc);">
+          <span class="status-badge status-ok">已完成</span> 🌊 预览图
+        </div>
+        <div class="result-info">
+          <div class="result-prompt">
+            蓝色天空背景的电商商品图，柔和自然光，高端质感
+            <span class="tip">一款高端护肤品的电商主图拍摄场景：产品放置在天然大理石台面上，背景是渐变的淡蓝色天空与柔和的云朵，清晨的自然光线从右侧窗户斜射进来，在产品表面形成温暖的金色反光，周围散落着几片新鲜的绿叶和一滴晶莹的水珠作为点缀，整体色调清新自然，传达出纯净、有机、高端的品牌调性，采用微距摄影视角，景深虚化处理，画面比例1:1，适合作为天猫/抖音小店的首图素材，要求光影层次丰富、质感细腻真实</span>
+          </div>
+          <div class="result-meta"><span>gpt-image-2 · 1:1</span><span>-10分</span></div>
+          <div class="result-dl" onclick="event.stopPropagation()">下载</div>
+        </div>
+      </div>
+
+      <!-- 卡片3：生成中 -->
+      <div class="result-card" onclick="openDetail(this)">
+        <div class="result-img" style="background:var(--fill);">
+          <span class="status-badge status-gen loading-dot">生成中…</span> ⏳
+        </div>
+        <div class="result-info">
+          <div class="result-prompt">
+            多元素融合电商场景图，高端质感，多光源布光
+            <span class="tip">一个完整的电商场景合成图：中央展示区放置一款智能手表产品（银色金属表带），左侧是一本打开的时尚杂志和一杯冒着热气的咖啡，右侧是一盆小型绿植和多色几何装饰品，桌面材质为浅色橡木纹理，背景是大面积的落地窗，窗外可见城市天际线的黄昏景色，室内暖色调灯光+窗外冷色调形成对比，整体氛围现代都市精英生活方式，2K分辨率，16:9横版构图，适合用于详情页首屏Banner或社交媒体推广素材</span>
+          </div>
+          <div class="result-meta"><span>nano · 16:9 · 2K</span><span>轮询中…</span></div>
+        </div>
+      </div>
+
+      <!-- 卡片4：失败 -->
+      <div class="result-card" onclick="openDetail(this)">
+        <div class="result-img" style="background:var(--soft);">
+          <span class="status-badge status-fail">失败</span> ✕
+        </div>
+        <div class="result-info">
+          <div class="result-prompt">
+            超高清产品细节图，微距摄影，极致细节呈现
+            <span class="tip">超微距产品摄影：珠宝项链的链节细节特写，每一颗钻石的切面都要清晰可见，火彩闪烁效果逼真，背景为深黑色丝绒材质以凸显钻石的光泽，使用环形补光灯+侧逆光组合布光，景深极浅仅焦点区域清晰，4K超高分辨率输出，用于电商详情页的"工艺细节"展示模块</span>
+          </div>
+          <div class="result-meta"><span>gpt-image-2 · 1:1</span><span style="color:#c86a58;">不扣积分</span></div>
+          <div class="result-dl" onclick="event.stopPropagation()" style="color:var(--muted);border-color:var(--line);background:transparent;">重新生成</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 个人中心（右侧覆盖） ===== -->
+  <div class="profile-panel" id="profilePanel">
+    <div class="profile-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h3>个人中心</h3>
+      </div>
+      <div class="view-tabs">
+        <div class="view-tab" onclick="switchView('results',this)">生成结果</div>
+        <div class="view-tab active" onclick="switchView('profile',this)">我的历史</div>
+      </div>
+    </div>
+    <div class="profile-body">
+      <div class="pts-card">
+        <div class="num">820</div>
+        <div class="lbl">剩余积分</div>
+      </div>
+      <div class="sec-title" style="font-size:14px;">我的生图历史</div>
+
+      <div class="hist-item">
+        <div class="thumb">缩略</div>
+        <div class="info">
+          <b>白色背景红色苹果</b><br>
+          nano 文生图 · 1:1 · 1K<br>
+          消耗 10 积分 · 07-26 00:15
+        </div>
+      </div>
+      <div class="hist-item">
+        <div class="thumb">缩略</div>
+        <div class="info">
+          <b>蓝色天空电商图</b><br>
+          gpt-image-2 文生图 · 1024x1024<br>
+          消耗 10 积分 · 07-25 22:40
+        </div>
+      </div>
+      <div class="hist-item">
+        <div class="thumb">缩略</div>
+        <div class="info">
+          <b>多图融合换背景</b><br>
+          nano 图生图 · 16:9 · 2K<br>
+          消耗 15 积分 · 07-25 21:10
+        </div>
+      </div>
+      <div class="hist-item" style="opacity:.5;">
+        <div class="thumb">—</div>
+        <div class="info">
+          <b style="color:#c86a58;">[已过期] 高清产品图</b><br>
+          gpt-image-2 文生图 · 1:1<br>
+          消耗 10 积分 · 07-20 14:30 · URL 已过期
+        </div>
+      </div>
+
+      <div class="hint-text" style="margin-top:16px;">
+        注：结果图仅存多米 URL，约 5 天过期后缩略图与下载链接失效
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ====== 详情弹窗（点击卡片弹出） ====== -->
+<div class="modal-overlay" id="detailModal" onclick="closeDetail(event)">
+  <div class="modal-card" style="position:relative;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeDetail(event)">✕</button>
+    <div class="modal-img" id="modalImg">🖼️ 大图预览区</div>
+    <div class="modal-body">
+      <h4>完整提示词</h4>
+      <div class="modal-prompt" id="modalPrompt">完整提示词内容...</div>
+      <div class="modal-meta">
+        <div class="modal-meta-item"><b>引擎：</b><span id="mEngine">nano</span></div>
+        <div class="modal-meta-item"><b>模式：</b><span id="mMode">文生图</span></div>
+        <div class="modal-meta-item"><b>比例：</b><span id="mRatio">1:1</span></div>
+        <div class="modal-meta-item"><b>分辨率：</b><span id="mRes">1K</span></div>
+        <div class="modal-meta-item"><b>节点：</b><span id="mNode">海外</span></div>
+        <div class="modal-meta-item"><b>消耗积分：</b><span id="mCost">-10</span></div>
+        <div class="modal-meta-item"><b>状态：</b><span id="mStatus" style="color:var(--ok);">已完成</span></div>
+        <div class="modal-meta-item"><b>生成时间：</b><span id="mTime">07-26 00:15</span></div>
+      </div>
+      <button class="submit-btn" style="margin-top:16px;" onclick="event.stopPropagation()">下载原图</button>
+      <button class="btn" style="width:100%;margin-top:8px;padding:10px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);background:#fff;" onclick="event.stopPropagation();copyPrompt()">📋 复制提示词</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 模式切换：文生图 ↔ 图生图
+  function switchMode(mode){
+    document.querySelectorAll('.mode-tab').forEach(t=>t.classList.toggle('active', t.dataset.mode===mode));
+    const refSec=document.getElementById('refImgSec');
+    if(mode==='i2i') refSec.classList.remove('hidden');
+    else refSec.classList.add('hidden');
+  }
+
+  // 模型选择
+  function selModel(el){
+    el.parentElement.querySelectorAll('.model-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // 右侧视图切换：生成结果 ↔ 我的历史
+  function switchView(view,tabEl){
+    document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
+    // 同步两个 header 的 tabs
+    document.querySelectorAll('.view-tab').forEach(t=>{
+      if(t.textContent.trim()===tabEl.textContent.trim()) t.classList.add('active');
+    });
+    document.getElementById('resultPanel').style.display=view==='results'?'flex':'none';
+    document.getElementById('profilePanel').classList.toggle('active', view==='profile');
+  }
+
+  // 预设比例点击同步下拉
+  document.querySelectorAll('.preset-tag').forEach(tag=>{
+    tag.addEventListener('click',()=>{
+      document.querySelectorAll('.preset-tag').forEach(t=>t.classList.remove('active'));
+      tag.classList.add('active');
+    });
+  });
+
+  // 节点切换
+  document.querySelectorAll('.node-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.node-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // ====== 详情弹窗 ======
+  function openDetail(card){
+    const prompt = card.querySelector('.result-prompt .tip')?.textContent || card.querySelector('.result-prompt').textContent;
+    const meta = card.querySelector('.result-meta');
+    const statusBadge = card.querySelector('.status-badge');
+
+    document.getElementById('modalPrompt').textContent = prompt;
+
+    // 从卡片元信息提取
+    const metaTexts = meta.querySelectorAll('span');
+    const engineInfo = metaTexts[0]?.textContent?.split('·') || [];
+    document.getElementById('mEngine').textContent = engineInfo[0]?.trim() || '—';
+    document.getElementById('mRatio').textContent = engineInfo[1]?.trim() || '—';
+    document.getElementById('mRes').textContent = engineInfo[2]?.trim() || '—';
+
+    // 状态
+    if(statusBadge?.classList.contains('status-ok')){
+      document.getElementById('mStatus').textContent='已完成';document.getElementById('mStatus').style.color='var(--ok)';
+    }else if(statusBadge?.classList.contains('status-gen')){
+      document.getElementById('mStatus').textContent='生成中';document.getElementById('mStatus').style.color='var(--run)';
+    }else{
+      document.getElementById('mStatus').textContent='失败';document.getElementById('mStatus').style.color='#c86a58';
+    }
+
+    document.getElementById('detailModal').classList.add('show');
+  }
+  function closeDetail(e){
+    if(e.target.closest('.modal-card') && !e.target.classList.contains('modal-close')) return;
+    document.getElementById('detailModal').classList.remove('show');
+  }
+  function copyPrompt(){
+    const t=document.getElementById('modalPrompt').textContent;
+    navigator.clipboard?.writeText(t).then(()=>{alert('提示词已复制到剪贴板');}).catch(()=>{
+      const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+      alert('提示词已复制到剪贴板');
+    });
+  }
+  // ESC 关闭弹窗
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail({target:document.body});});
+</script>
+</body>
+</html>
