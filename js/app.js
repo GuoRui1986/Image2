@@ -169,7 +169,10 @@ function addCard(taskId, prompt) {
   const grid = $('#result-grid');
   const c = document.createElement('div'); c.className = 'result-item'; c.dataset.task = taskId; c.dataset.prompt = prompt || '';
   c.innerHTML = `<div class="res-status">排队中…</div><div class="copy-prompt">复制提示词</div><img style="display:none">`;
-  c.addEventListener('click', () => openPreview(c.dataset.task));
+  c.addEventListener('click', () => {
+    const img = c.querySelector('img');
+    if (img && img.src && img.style.display !== 'none') openPreview(img.src, c.dataset.prompt);
+  });
   grid.prepend(c);
 }
 function updateCard(taskId, data) {
@@ -188,15 +191,11 @@ function updateCard(taskId, data) {
     st.classList.add('fail');
   }
 }
-function openPreview(taskId) {
-  const c = $(`.result-item[data-task="${taskId}"]`); if (!c) return;
-  const img = c.querySelector('img');
-  if (!img.src || img.style.display === 'none') return;
-  $('#preview-img').src = img.src;
-  $('#preview-prompt').textContent = c.dataset.prompt || '无提示词';
-  const dl = $('#preview-download');
-  dl.href = img.src;
-  dl.download = 'Rui生图-' + new Date().toISOString().slice(0, 10) + '-' + taskId.slice(-6) + '.png';
+function openPreview(url, prompt) {
+  if (!url) return;
+  $('#preview-img').src = url;
+  $('#preview-prompt').textContent = prompt || '无提示词';
+  $('#preview-download').dataset.url = url;
   $('#preview-modal').style.display = 'flex';
 }
 function closePreview() { $('#preview-modal').style.display = 'none'; }
@@ -205,6 +204,25 @@ $('#preview-modal').addEventListener('click', (e) => { if (e.target === $('#prev
 $('#preview-copy').addEventListener('click', async () => {
   const t = $('#preview-prompt').textContent;
   try { await navigator.clipboard.writeText(t); alert('提示词已复制'); } catch (_) { alert('复制失败，请手动复制'); }
+});
+async function downloadImage(url, filename) {
+  if (!url) return;
+  try {
+    const r = await fetch(url, { mode: 'cors' });
+    if (!r.ok) throw new Error('fetch failed');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'Rui生图-' + new Date().toISOString().slice(0, 10) + '.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (_) {
+    window.open(url, '_blank');
+  }
+}
+$('#preview-download').addEventListener('click', () => {
+  const url = $('#preview-download').dataset.url;
+  downloadImage(url);
 });
 function startPoll() { if (!state.pollTimer) state.pollTimer = setInterval(pollTick, 4000); }
 async function pollTick() {
@@ -442,11 +460,7 @@ async function loadGenLogs() {
       <td class="td-muted">${(g.created_at || '').slice(5, 16).replace('T', ' ')}</td>`;
     tr.querySelector('.res-cell').innerHTML = result;
     const im = tr.querySelector('.thumb-img');
-    if (im) im.addEventListener('click', () => {
-      $('#preview-img').src = im.dataset.url;
-      $('#preview-prompt').textContent = im.dataset.prompt || '无提示词';
-      $('#preview-modal').style.display = 'flex';
-    });
+    if (im) im.addEventListener('click', () => openPreview(im.dataset.url, im.dataset.prompt));
     tb.appendChild(tr);
   });
 }
