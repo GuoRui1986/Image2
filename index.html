@@ -318,13 +318,17 @@
               </select>
             </div>
             <button class="btn-sm" id="btn-filter">筛选</button>
-            <button class="btn-sm ghost" id="btn-export">导出 CSV</button>
+            <button class="btn-sm ghost" id="btn-export">📥 导出 CSV</button>
           </div>
           <div class="block">
             <table id="genlog-table"><thead><tr>
               <th>用户</th><th>方式</th><th>提示词</th><th>参考图</th><th>结果图</th><th>扣分</th><th>状态</th><th>时间</th>
             </tr></thead><tbody></tbody></table>
             <div class="note">「参考图」列仅图生图有值；结果图 URL 超过约 5 天会失效。</div>
+            <div class="table-foot">
+              <span id="record-count">共 0 条记录</span>
+              <div class="pager"><button disabled>&lt;</button><button class="active">1</button><button disabled>&gt;</button></div>
+            </div>
           </div>
         </div>
 

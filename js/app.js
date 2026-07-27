@@ -465,8 +465,8 @@ async function loadGenLogs() {
     const result = g.result_image
       ? `<img class="thumb-img" src="${esc(g.result_image)}" onerror="this.outerHTML='<span class=&quot;thumb-ph&quot;>过期</span>'" data-url="${esc(g.result_image)}" data-prompt="${esc(g.prompt || '')}">`
       : '<span class="td-muted">无</span>';
-    tr.innerHTML = `<td>${esc(g.phone)}</td><td class="td-muted">${mName(g.method)}</td>
-      <td class="td-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(g.prompt)}">${esc((g.prompt || '').slice(0, 40))}</td>
+    tr.innerHTML = `<td><span class="user-cell"><span class="user-ico">👤</span>${esc(g.phone)}</span></td><td class="td-muted">${mName(g.method)}</td>
+      <td class="td-muted prompt-cell" title="${esc(g.prompt)}">${esc((g.prompt || '').slice(0, 40))}</td>
       <td>${refs}</td><td class="res-cell"></td>
       <td>${g.cost ? '-' + g.cost : 0}</td>
       <td>${STATUS_BADGE[g.status] || esc(g.status)}</td>
@@ -476,6 +476,7 @@ async function loadGenLogs() {
     if (im) im.addEventListener('click', () => openPreview(im.dataset.url, im.dataset.prompt));
     tb.appendChild(tr);
   });
+  $('#record-count').textContent = `共 ${body.data.length} 条记录`;
 }
 $('#btn-filter').addEventListener('click', loadGenLogs);
 $('#btn-export').addEventListener('click', () => {
