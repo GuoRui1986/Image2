@@ -465,7 +465,7 @@ async function loadGenLogs() {
     const result = g.result_image
       ? `<img class="thumb-img" src="${esc(g.result_image)}" onerror="this.outerHTML='<span class=&quot;thumb-ph&quot;>过期</span>'" data-url="${esc(g.result_image)}" data-prompt="${esc(g.prompt || '')}">`
       : '<span class="td-muted">无</span>';
-    tr.innerHTML = `<td><span class="user-cell"><span class="user-ico">👤</span>${esc(g.phone)}</span></td><td class="td-muted">${mName(g.method)}</td>
+    tr.innerHTML = `<td><span class="user-cell"><svg class="user-ico"><use href="#i-user"/></svg>${esc(g.phone)}</span></td><td class="td-muted">${mName(g.method)}</td>
       <td class="td-muted prompt-cell" title="${esc(g.prompt)}">${esc((g.prompt || '').slice(0, 40))}</td>
       <td>${refs}</td><td class="res-cell"></td>
       <td>${g.cost ? '-' + g.cost : 0}</td>
