@@ -194,6 +194,9 @@ function openPreview(taskId) {
   if (!img.src || img.style.display === 'none') return;
   $('#preview-img').src = img.src;
   $('#preview-prompt').textContent = c.dataset.prompt || '无提示词';
+  const dl = $('#preview-download');
+  dl.href = img.src;
+  dl.download = 'Rui生图-' + new Date().toISOString().slice(0, 10) + '-' + taskId.slice(-6) + '.png';
   $('#preview-modal').style.display = 'flex';
 }
 function closePreview() { $('#preview-modal').style.display = 'none'; }

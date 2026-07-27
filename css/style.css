@@ -155,4 +155,5 @@ td button { margin-right: 4px; }
 .preview-box img { max-width: min(720px, 80vw); max-height: 70vh; border-radius: 6px; object-fit: contain; }
 .preview-info { margin-top: 12px; width: 100%; }
 .preview-prompt { background: #f5f6f7; border-radius: 6px; padding: 10px; font-size: 13px; line-height: 1.5; max-height: 120px; overflow: auto; word-break: break-all; margin-bottom: 10px; }
-.preview-info button { margin-right: 8px; }
+.preview-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.preview-actions a { text-decoration: none; }
