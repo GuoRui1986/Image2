@@ -44,7 +44,8 @@ function route() {
     $('#hdr-phone').textContent = state.user.phone;
     $('#hdr-balance').textContent = state.user.balance;
     $('#hdr-role').textContent = state.user.role === 'admin' ? '管理员' : '用户';
-    $('#btn-to-admin').style.display = state.user.role === 'admin' ? 'inline-block' : 'none';
+    $('#btn-to-user').style.display = (h !== '#/user') ? 'inline-block' : 'none';
+    $('#btn-to-admin').style.display = (state.user.role === 'admin' && h !== '#/admin') ? 'inline-block' : 'none';
     const vt = $('#hdr-view-tag');
     vt.style.display = 'inline-block';
     vt.textContent = h === '#/admin' ? '管理端' : '用户端';
@@ -80,7 +81,18 @@ function syncUserControls() {
 }
 $('#sel-engine').addEventListener('change', syncUserControls);
 $('#sel-mode').addEventListener('change', syncUserControls);
+$$('#mode-cards .mode-card').forEach(card => {
+  card.addEventListener('click', () => {
+    $$('#mode-cards .mode-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    $('#sel-mode').value = card.dataset.mode;
+    syncUserControls();
+  });
+});
+$('#inp-prompt').addEventListener('input', () => { $('#prompt-count').textContent = $('#inp-prompt').value.length; });
 $('#inp-count').addEventListener('input', () => { $('#count-label').textContent = $('#inp-count').value + ' 张'; });
+$('#btn-clear-results').addEventListener('click', () => { $('#result-grid').innerHTML = ''; });
+syncUserControls();
 
 // 参考图上传（点击 + 拖拽）
 const refDrop = $('#ref-drop');
@@ -168,7 +180,8 @@ $('#btn-generate').addEventListener('click', async () => {
 function addCard(taskId, prompt) {
   const grid = $('#result-grid');
   const c = document.createElement('div'); c.className = 'result-item'; c.dataset.task = taskId; c.dataset.prompt = prompt || '';
-  c.innerHTML = `<div class="res-status">排队中…</div><div class="copy-prompt">复制提示词</div><img style="display:none">`;
+  c.innerHTML = `<button class="res-close" title="移除">×</button><div class="res-status">排队中…</div><img style="display:none">`;
+  c.querySelector('.res-close').addEventListener('click', (e) => { e.stopPropagation(); c.remove(); });
   c.addEventListener('click', () => {
     const img = c.querySelector('img');
     if (img && img.src && img.style.display !== 'none') openPreview(img.src, c.dataset.prompt);

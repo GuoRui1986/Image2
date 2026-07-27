@@ -33,31 +33,58 @@
 
   <!-- 用户端 -->
   <section id="view-user" class="view" style="display:none">
-    <div class="layout">
-      <aside class="panel">
-        <h3>生图设置</h3>
-        <label>引擎
-          <select id="sel-engine">
-            <option value="image2">image2（gpt-image-2）</option>
-            <option value="nano">nano（gemini）</option>
-          </select>
-        </label>
-        <label>方式
-          <select id="sel-mode">
-            <option value="t2i">文生图</option>
+    <div class="layout user-layout">
+      <aside class="panel settings-panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="ico">✨</span>生图设置</div>
+          <div class="panel-sub">调参数，生成精美图片</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">引擎</label>
+          <div class="select-wrap">
+            <span class="select-ico">🤖</span>
+            <select id="sel-engine">
+              <option value="image2">image2（gpt-image-2）</option>
+              <option value="nano">nano（gemini）</option>
+            </select>
+            <span class="select-arrow">▾</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">方式</label>
+          <div class="mode-cards" id="mode-cards">
+            <div class="mode-card active" data-mode="i2i">
+              <span class="mico">🖼️</span>
+              <div class="mtext"><b>图生图</b><small>上传参考图生成</small></div>
+            </div>
+            <div class="mode-card" data-mode="t2i">
+              <span class="mico">📝</span>
+              <div class="mtext"><b>文生图</b><small>仅凭文字描述</small></div>
+            </div>
+          </div>
+          <select id="sel-mode" style="display:none">
             <option value="i2i">图生图</option>
+            <option value="t2i">文生图</option>
           </select>
-        </label>
-        <label>提示词（prompt）
-          <textarea id="inp-prompt" rows="4" placeholder="描述你想要的图像…"></textarea>
-        </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">提示词（prompt）</label>
+          <div class="prompt-wrap">
+            <textarea id="inp-prompt" maxlength="1000" placeholder="描述你想要的图像…"></textarea>
+            <div class="prompt-count"><span id="prompt-count">0</span> / 1000</div>
+          </div>
+        </div>
 
         <!-- 图生图参考图 -->
-        <div id="ref-zone" style="display:none">
-          <div class="sub">参考图（最多 10 张，支持拖拽或点击上传）</div>
+        <div id="ref-zone" class="field" style="display:none">
+          <label class="field-label">参考图（最多 10 张，支持拖拽或点击上传）</label>
           <div id="ref-drop" class="ref-drop">
             <input id="inp-ref" type="file" accept="image/*" multiple hidden />
-            <div class="ref-drop-text">
+            <div class="ref-drop-inner">
+              <div class="ref-drop-ico">☁️</div>
               <div>点击或拖拽图片到此处</div>
               <div class="ref-drop-hint">最多 10 张，生成后会自动删除</div>
             </div>
@@ -66,68 +93,105 @@
         </div>
 
         <!-- image2 参数 -->
-        <div id="param-image2">
-          <label>尺寸 size
-            <select id="sel-size">
-              <option value="">默认 auto</option>
-              <option value="1024x1024">1024x1024</option>
-              <option value="1792x1024">1792x1024</option>
-              <option value="1024x1792">1024x1792</option>
-              <option value="1:1">1:1</option>
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-            </select>
-          </label>
-          <label>质量 quality
-            <select id="sel-quality">
-              <option value="">默认</option>
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-            </select>
-          </label>
-          <label class="chk"><input id="chk-oversea" type="checkbox" /> 海外节点（oversea）</label>
+        <div id="param-image2" class="params-block">
+          <div class="field half">
+            <label class="field-label">尺寸 size</label>
+            <div class="select-wrap sm">
+              <select id="sel-size">
+                <option value="">默认 auto</option>
+                <option value="1024x1024">1024x1024</option>
+                <option value="1792x1024">1792x1024</option>
+                <option value="1024x1792">1024x1792</option>
+                <option value="1:1">1:1</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
+          <div class="field half">
+            <label class="field-label">质量 quality</label>
+            <div class="select-wrap sm">
+              <select id="sel-quality">
+                <option value="">默认</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
+          <div class="field toggle-field">
+            <span class="toggle-label">海外节点（oversea）</span>
+            <label class="switch">
+              <input id="chk-oversea" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
 
         <!-- nano 参数 -->
-        <div id="param-nano" style="display:none">
-          <label>比例 aspect_ratio
-            <select id="sel-aspect">
-              <option value="auto">auto</option>
-              <option value="1:1">1:1</option>
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-              <option value="4:3">4:3</option>
-              <option value="3:4">3:4</option>
-              <option value="21:9">21:9</option>
-            </select>
-          </label>
-          <label>尺寸 image_size
-            <select id="sel-imgsize">
-              <option value="1K">1K</option>
-              <option value="2K">2K</option>
-              <option value="4K">4K</option>
-            </select>
-          </label>
-          <label>模型 model
-            <select id="sel-nano-model">
-              <option value="gemini-3.1-flash-image-preview">gemini-3.1-flash-image-preview</option>
-              <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
-              <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview</option>
-            </select>
-          </label>
+        <div id="param-nano" class="params-block" style="display:none">
+          <div class="field half">
+            <label class="field-label">比例 aspect_ratio</label>
+            <div class="select-wrap sm">
+              <select id="sel-aspect">
+                <option value="auto">auto</option>
+                <option value="1:1">1:1</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="21:9">21:9</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
+          <div class="field half">
+            <label class="field-label">尺寸 image_size</label>
+            <div class="select-wrap sm">
+              <select id="sel-imgsize">
+                <option value="1K">1K</option>
+                <option value="2K">2K</option>
+                <option value="4K">4K</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">模型 model</label>
+            <div class="select-wrap sm">
+              <select id="sel-nano-model">
+                <option value="gemini-3.1-flash-image-preview">gemini-3.1-flash-image-preview</option>
+                <option value="gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+                <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview</option>
+              </select>
+              <span class="select-arrow">▾</span>
+            </div>
+          </div>
         </div>
 
-        <label>数量（1-10，循环生成）
+        <div class="field count-field">
+          <div class="count-head">
+            <label class="field-label">数量</label>
+            <span class="count-value" id="count-label">1 张</span>
+          </div>
+          <div class="count-sub">1-10，循环生成</div>
           <input id="inp-count" type="range" min="1" max="10" value="1" />
-          <span id="count-label">1 张</span>
-        </label>
-        <button id="btn-generate" class="btn-primary">开始生成</button>
+        </div>
+
+        <button id="btn-generate" class="btn-generate">⚡ 开始生成</button>
         <div id="gen-msg" class="msg"></div>
       </aside>
 
-      <main class="panel results">
-        <h3>生成结果</h3>
+      <main class="panel results-panel">
+        <div class="results-head">
+          <div class="panel-head">
+            <div class="panel-title"><span class="ico">🖼️</span>生成结果</div>
+            <div class="panel-sub">AI 生成的图片将显示在这里</div>
+          </div>
+          <button id="btn-clear-results" class="btn-ghost">🗑️ 清空结果</button>
+        </div>
         <div id="result-grid" class="result-grid"></div>
       </main>
     </div>
