@@ -283,6 +283,75 @@
   .view-tab{font-size:12px;padding:6px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;}
   .view-tab.active{color:var(--text);border-bottom-color:var(--pri);font-weight:600;}
 
+  /* ====== 顶部主导航 ====== */
+  .app-nav{display:flex;gap:4px;margin-left:28px;}
+  .app-nav .nav-item{font-size:13px;padding:6px 16px;border-radius:6px;cursor:pointer;color:var(--muted);transition:all .15s;}
+  .app-nav .nav-item:hover{color:var(--text);}
+  .app-nav .nav-item.active{background:var(--pri-bg);color:var(--pri);font-weight:600;}
+
+  /* ====== 开关 toggle ====== */
+  .switch{position:relative;display:inline-block;width:34px;height:19px;flex:none;}
+  .switch input{display:none;}
+  .switch .sl{position:absolute;inset:0;background:#c8cdd3;border-radius:10px;transition:.2s;cursor:pointer;display:block;}
+  .switch .sl::before{content:'';position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .switch input:checked + .sl{background:var(--pri);}
+  .switch input:checked + .sl::before{left:17px;}
+  .switch input:disabled + .sl{opacity:.35;cursor:not-allowed;}
+
+  /* ====== 策划器：向导 ====== */
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:7px;background:#fff;}
+  .toggle-row .tl{font-size:13px;font-weight:500;}
+  .toggle-row .td{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;}
+
+  /* ====== 策划器：产品图上传 ====== */
+  .prod-img-box{display:flex;gap:10px;align-items:center;padding:10px;border:1.5px solid var(--line);border-radius:8px;background:#fff;}
+  .prod-thumb{width:64px;height:64px;border-radius:6px;background:linear-gradient(135deg,#dfe6ec,#c9d4dd);display:flex;align-items:center;justify-content:center;font-size:26px;flex:none;position:relative;}
+  .prod-thumb .del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#c86a58;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fff;}
+  .prod-img-info{flex:1;min-width:0;}
+  .prod-img-info .fn{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .prod-img-info .st{font-size:11px;color:var(--ok);margin-top:3px;}
+  .prod-img-info .st2{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5;}
+
+  /* ====== 策划器：AI 产品分析块 ====== */
+  .ai-analysis{width:100%;border:1px solid rgba(42,157,90,.25);border-radius:8px;background:rgba(42,157,90,.04);padding:12px 14px;}
+  .ai-analysis .aa-head{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ok);}
+  .ai-analysis .aa-tag{font-size:10px;font-weight:normal;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;background:#fff;}
+  .ai-analysis .aa-grid{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px;font-size:12px;line-height:1.6;}
+  .ai-analysis .aa-item b{color:var(--muted);font-weight:600;font-size:11px;margin-right:4px;}
+
+  /* ====== 策划器：思考折叠区 ====== */
+  .think-fold{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;overflow:hidden;}
+  .think-head{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;color:var(--muted);cursor:pointer;background:var(--soft);user-select:none;}
+  .think-head .arrow{transition:transform .2s;font-size:10px;}
+  .think-fold.open .think-head .arrow{transform:rotate(90deg);}
+  .think-body{display:none;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7;border-top:1px solid var(--line);max-height:150px;overflow-y:auto;}
+  .think-fold.open .think-body{display:block;}
+
+  /* ====== 策划器：板块卡 ====== */
+  .plan-card{width:calc(50% - 8px);min-width:380px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:14px 16px;transition:box-shadow .15s;}
+  .plan-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.06);}
+  .pc-head{display:flex;align-items:center;gap:8px;}
+  .pc-idx{width:22px;height:22px;border-radius:6px;background:var(--pri-bg);color:var(--pri);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;}
+  .pc-name{font-size:14px;font-weight:600;flex:1;}
+  .pc-badge{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;}
+  .pc-badge.m-img2{border-color:rgba(232,90,10,.3);color:var(--pri);background:var(--pri-bg);}
+  .pc-badge.m-nano{border-color:rgba(42,157,90,.3);color:var(--ok);background:rgba(42,157,90,.06);}
+  .pc-label{font-size:11px;color:var(--muted);font-weight:600;margin:10px 0 5px;letter-spacing:.3px;}
+  .pc-prompt{width:100%;min-height:66px;padding:8px 10px;border:1.5px solid var(--line);border-radius:6px;font-size:12px;line-height:1.6;font-family:inherit;color:var(--text);outline:none;background:#fff;white-space:pre-wrap;word-break:break-all;overflow-y:auto;max-height:180px;}
+  .pc-prompt:focus{border-color:var(--pri);}
+  .title-seg{background:rgba(232,90,10,.14);border-radius:3px;padding:1px 2px;box-decoration-break:clone;-webkit-box-decoration-break:clone;transition:background .2s;}
+  .copy-box{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:8px 10px;}
+  .copy-line{display:flex;align-items:flex-start;gap:6px;font-size:12px;padding:3px 0;}
+  .copy-line .k{color:var(--muted);flex:none;font-size:11px;padding-top:1px;}
+  .copy-line .v{flex:1;color:var(--text);line-height:1.5;}
+  .copy-btn{font-size:10px;color:var(--pri);border:1px solid rgba(232,90,10,.25);border-radius:3px;padding:1px 8px;cursor:pointer;background:#fff;flex:none;}
+  .copy-btn:hover{background:var(--pri-bg);}
+  .pc-foot{display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .pc-title-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);flex:1;}
+  .pc-fill-btn{font-size:12px;font-weight:600;padding:7px 18px;border:none;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#e85a0a,#ff7a2e);color:#fff;}
+  .pc-fill-btn:hover{opacity:.9;}
+  .pc-note{font-size:11px;color:var(--run);margin-top:8px;background:rgba(212,160,23,.07);border-radius:4px;padding:5px 8px;line-height:1.5;}
+
   /* 隐藏类 */
   .hidden{display:none!important;}
 </style>
@@ -302,7 +371,13 @@
 
 <!-- ============ 顶栏 ============ -->
 <div class="topbar">
-  <span class="brand">AI 生图工具</span>
+  <div style="display:flex;align-items:center;">
+    <span class="brand">AI 生图工具</span>
+    <div class="app-nav">
+      <div class="nav-item active" id="navGen" onclick="switchPage('gen')">生图工作台</div>
+      <div class="nav-item" id="navPlan" onclick="switchPage('plan')">详情图策划</div>
+    </div>
+  </div>
   <div class="right">
     <span class="phone">138****0001</span>
     <span class="pts">剩余积分：<b>820</b></span>
@@ -310,8 +385,8 @@
   </div>
 </div>
 
-<!-- ============ 主区域 ============ -->
-<div class="main">
+<!-- ============ 主区域：生图工作台 ============ -->
+<div class="main" id="pageGen">
 
   <!-- ===== 左侧操作区 ===== -->
   <div class="left-panel">
@@ -344,6 +419,14 @@
       <!-- 图生图专属：上传参考图（默认隐藏） -->
       <div id="refImgSec" class="hidden">
         <div class="sec-title">上传参考图片 <span style="color:var(--pri);font-weight:normal;">(最多10张)</span></div>
+        <!-- 从策划器「填入生图」带入的产品图（默认隐藏，带入时显示） -->
+        <div class="prod-img-box hidden" id="carriedProdImg" style="margin-bottom:8px;">
+          <div class="prod-thumb">🥤<span class="del" title="移除" onclick="document.getElementById('carriedProdImg').classList.add('hidden')">✕</span></div>
+          <div class="prod-img-info">
+            <div class="fn">baowenbei_shipai.jpg</div>
+            <div class="st">✓ 由「详情图策划」自动带入</div>
+          </div>
+        </div>
         <div class="upload-zone">
           <div class="upload-icon">📤</div>
           <div class="upload-text">点击或拖拽图片到此处上传</div>
@@ -532,7 +615,207 @@
     </div>
   </div>
 
-</div><!-- /main -->
+</div><!-- /main 生图工作台 -->
+
+<!-- ============ 主区域：详情图策划 ============ -->
+<div class="main hidden" id="pagePlan">
+
+  <!-- ===== 左侧：策划向导 ===== -->
+  <div class="left-panel">
+    <div class="sec-title" style="font-size:13px;color:var(--text);margin-top:0;">📋 商品信息向导</div>
+    <div class="hint-text" style="margin-bottom:14px;">填写商品信息，AI 一次产出整套详情图「提示词 + 文案」，逐张确认后再去生成，不浪费积分</div>
+
+    <div class="sec-title">产品图 <span style="color:var(--pri);font-weight:normal;">(推荐上传实拍图)</span></div>
+    <!-- 未上传时显示 upload-zone；已上传后显示下方状态卡（原型演示已上传态） -->
+    <div class="prod-img-box">
+      <div class="prod-thumb">🥤<span class="del" title="移除">✕</span></div>
+      <div class="prod-img-info">
+        <div class="fn">baowenbei_shipai.jpg</div>
+        <div class="st">✓ AI 已分析（分析结果见右侧顶部）</div>
+        <div class="st2">「填入生图」时此图将自动作为参考图，走图生图，出图不跑型</div>
+      </div>
+    </div>
+    <div class="hint-text" style="margin-top:6px;">不传图也能策划：AI 仅根据下方文字信息出提示词</div>
+
+    <div class="sec-title">商品名称 <span style="color:#c86a58;">*</span></div>
+    <input class="input" value="316不锈钢智能保温杯">
+
+    <div class="sec-title">商品类目 <span style="color:#c86a58;">*</span></div>
+    <div class="select-row">
+      <select class="select">
+        <option>家居生活</option><option>服饰鞋包</option><option>美妆个护</option>
+        <option>3C数码</option><option>食品生鲜</option><option>母婴用品</option><option>其他</option>
+      </select>
+    </div>
+
+    <div class="sec-title">核心卖点 <span style="color:var(--muted);font-weight:normal;">(每行一条，建议 3–5 条)</span></div>
+    <div class="hint-text" style="margin-bottom:6px;">已上传产品图：AI 看图自动提炼了以下卖点，可修改、删减或补充</div>
+    <textarea class="textarea" style="min-height:88px;">保温24小时不凉
+一键弹盖单手可开
+母婴级316不锈钢内胆
+杯身防摔防刮花</textarea>
+
+    <div class="sec-title">目标风格</div>
+    <div class="select-row">
+      <select class="select">
+        <option>极简高级感</option><option>清新自然</option><option>国潮风</option>
+        <option>科技感</option><option>温馨家庭风</option>
+      </select>
+    </div>
+
+    <div class="sec-title">目标平台 <span style="color:var(--muted);font-weight:normal;">(影响尺寸规范)</span></div>
+    <div class="select-row">
+      <select class="select">
+        <option>淘宝/天猫</option><option>抖音小店</option><option>京东</option><option>拼多多</option><option>亚马逊</option>
+      </select>
+    </div>
+
+    <div class="sec-title">品牌色 / 关键词 <span style="color:var(--muted);font-weight:normal;">(可选)</span></div>
+    <input class="input" placeholder="如：雾灰蓝、莫兰迪色系" value="雾灰蓝">
+
+    <div class="sec-title">深度思考</div>
+    <div class="toggle-row">
+      <div>
+        <div class="tl">深度思考模式</div>
+        <div class="td">开启后 AI 思考更充分、耗时更长，思考过程可展开查看</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="thinkToggle"><span class="sl"></span></label>
+    </div>
+
+    <button class="submit-btn" style="margin-top:18px;" onclick="alert('原型演示：右侧为策划结果示例')">生成策划方案（-5 积分）</button>
+    <div class="hint-text" style="text-align:center;">策划只出提示词和文案，不出图 · 失败不扣分</div>
+  </div>
+
+  <!-- ===== 右侧：板块卡片结果区 ===== -->
+  <div class="right-panel">
+    <div class="result-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <h3>策划结果 · 316不锈钢智能保温杯</h3>
+        <span class="count">9 个板块 · 淘宝/天猫 · 极简高级感</span>
+      </div>
+    </div>
+
+    <div class="result-body" style="gap:16px;">
+
+      <!-- AI 产品分析块（上传了产品图才出现，来自视觉模型看图） -->
+      <div class="ai-analysis">
+        <div class="aa-head">🔍 AI 产品分析 <span class="aa-tag">来自产品实拍图</span></div>
+        <div class="aa-grid">
+          <div class="aa-item"><b>品类</b>保温杯（智能弹盖款）</div>
+          <div class="aa-item"><b>材质/颜色</b>316不锈钢 · 雾灰蓝磨砂杯身 · 金属拉丝杯盖</div>
+          <div class="aa-item"><b>结构特征</b>顶部弹盖按钮 · 便携提环 · 杯底防滑垫</div>
+          <div class="aa-item" style="width:100%;"><b>看图提炼卖点</b>一键弹盖单手可开 · 磨砂防滑手感 · 便携提环易外带（已并入左侧卖点，可修改）</div>
+        </div>
+      </div>
+
+      <!-- 思考过程折叠区（开深度思考才出现） -->
+      <div class="think-fold" id="thinkFold">
+        <div class="think-head" onclick="this.parentElement.classList.toggle('open')">
+          <span class="arrow">▶</span> 💭 AI 思考过程（深度思考已开启 · 点击展开）
+        </div>
+        <div class="think-body">
+          用户的商品是保温杯，属家居生活类目，目标平台淘宝主图规范为 800x800……卖点中"保温24小时"最具冲击力，适合作主图主标题；"母婴级材质"适合信任型板块……品牌色雾灰蓝应贯穿全部板块的背景与道具配色，保持整套视觉统一……
+        </div>
+      </div>
+
+      <!-- 板块① 主图 -->
+      <div class="plan-card">
+        <div class="pc-head">
+          <span class="pc-idx">1</span><span class="pc-name">主图 / 首图</span>
+          <span class="pc-badge m-img2">image2</span><span class="pc-badge">800×800</span>
+        </div>
+        <div class="pc-label">画面提示词（可编辑）</div>
+        <div class="pc-prompt" contenteditable="true">雾灰蓝渐变背景中央，一只316不锈钢保温杯呈45度角矗立于哑光石台，杯身金属拉丝质感，顶部柔和主光+左侧补光，杯口飘出一缕淡淡热气，画面上方1/4处预留干净留白区域，极简高级感，商业产品摄影，构图居中偏下</div>
+        <div class="pc-label">文案包</div>
+        <div class="copy-box">
+          <div class="copy-line"><span class="k">主标题</span><span class="v">24小时锁温</span><button class="copy-btn" onclick="copyText('24小时锁温')">复制</button></div>
+          <div class="copy-line"><span class="k">副标题</span><span class="v">一杯热水，暖到深夜</span><button class="copy-btn" onclick="copyText('一杯热水，暖到深夜')">复制</button></div>
+          <div class="copy-line"><span class="k">卖点句</span><span class="v">·母婴级316内胆 ·一键弹盖 ·防摔防刮</span><button class="copy-btn" onclick="copyText('·母婴级316内胆 ·一键弹盖 ·防摔防刮')">复制</button></div>
+        </div>
+        <div class="pc-foot">
+          <div class="pc-title-toggle">
+            <label class="switch"><input type="checkbox" checked onchange="toggleCopy(this)"><span class="sl"></span></label>
+            文案入图（主标题+副标题+卖点画进图）
+          </div>
+          <button class="pc-fill-btn" onclick="fillToGen('主图')">填入生图</button>
+        </div>
+      </div>
+
+      <!-- 板块② 核心场景 -->
+      <div class="plan-card">
+        <div class="pc-head">
+          <span class="pc-idx">2</span><span class="pc-name">核心场景图</span>
+          <span class="pc-badge m-img2">image2</span><span class="pc-badge">750×1000</span>
+        </div>
+        <div class="pc-label">画面提示词（可编辑）</div>
+        <div class="pc-prompt" contenteditable="true">清晨书房场景，保温杯放在原木书桌上，旁边摊开的笔记本与一副眼镜，晨光从纱帘斜射入室在杯身形成柔和高光，雾灰蓝与原木色调和谐，景深虚化背景书架，温暖生活氛围，极简高级感</div>
+        <div class="pc-label">文案包</div>
+        <div class="copy-box">
+          <div class="copy-line"><span class="k">主标题</span><span class="v">早出晚归 热度不减</span><button class="copy-btn" onclick="copyText('早出晚归 热度不减')">复制</button></div>
+          <div class="copy-line"><span class="k">副标题</span><span class="v">清晨灌满，深夜依然烫口</span><button class="copy-btn" onclick="copyText('清晨灌满，深夜依然烫口')">复制</button></div>
+        </div>
+        <div class="pc-foot">
+          <div class="pc-title-toggle">
+            <label class="switch"><input type="checkbox" checked onchange="toggleCopy(this)"><span class="sl"></span></label>
+            文案入图
+          </div>
+          <button class="pc-fill-btn" onclick="fillToGen('核心场景图')">填入生图</button>
+        </div>
+      </div>
+
+      <!-- 板块③ 人群/情绪 -->
+      <div class="plan-card">
+        <div class="pc-head">
+          <span class="pc-idx">3</span><span class="pc-name">人群 / 情绪图</span>
+          <span class="pc-badge m-nano">nano</span><span class="pc-badge">750×1000</span>
+        </div>
+        <div class="pc-label">画面提示词（可编辑）</div>
+        <div class="pc-prompt" contenteditable="true">年轻妈妈在温馨厨房中为孩子的水杯倒入热水，微笑侧脸，暖色晨光，保温杯置于画面前景清晰对焦，人物背景轻微虚化，生活纪实感，画面整体色调柔和，不出现任何文字</div>
+        <div class="pc-label">文案包</div>
+        <div class="copy-box">
+          <div class="copy-line"><span class="k">主标题</span><span class="v">给家人的安心温度</span><button class="copy-btn" onclick="copyText('给家人的安心温度')">复制</button></div>
+          <div class="copy-line"><span class="k">卖点句</span><span class="v">·母婴级材质 ·无异味不挂垢</span><button class="copy-btn" onclick="copyText('·母婴级材质 ·无异味不挂垢')">复制</button></div>
+        </div>
+        <div class="pc-note">⚠ 该板块建议画面留白，文字后期添加（人物图入字易乱码）</div>
+        <div class="pc-foot">
+          <div class="pc-title-toggle">
+            <label class="switch"><input type="checkbox" disabled><span class="sl"></span></label>
+            文案入图（该板块不支持）
+          </div>
+          <button class="pc-fill-btn" onclick="fillToGen('人群情绪图')">填入生图</button>
+        </div>
+      </div>
+
+      <!-- 板块④ 功能细节 -->
+      <div class="plan-card">
+        <div class="pc-head">
+          <span class="pc-idx">4</span><span class="pc-name">功能细节特写</span>
+          <span class="pc-badge m-img2">image2</span><span class="pc-badge">750×750</span>
+        </div>
+        <div class="pc-label">画面提示词（可编辑）</div>
+        <div class="pc-prompt" contenteditable="true">微距特写：拇指按压保温杯顶部弹盖按钮的瞬间，杯盖弹开细节清晰，金属按钮反光锐利，深灰渐变背景，单侧硬光凸显机械结构质感，产品细节摄影，右侧预留竖向留白</div>
+        <div class="pc-label">文案包</div>
+        <div class="copy-box">
+          <div class="copy-line"><span class="k">主标题</span><span class="v">单手一按 即刻畅饮</span><button class="copy-btn" onclick="copyText('单手一按 即刻畅饮')">复制</button></div>
+        </div>
+        <div class="pc-foot">
+          <div class="pc-title-toggle">
+            <label class="switch"><input type="checkbox" onchange="toggleCopy(this)"><span class="sl"></span></label>
+            文案入图
+          </div>
+          <button class="pc-fill-btn" onclick="fillToGen('功能细节特写')">填入生图</button>
+        </div>
+      </div>
+
+      <!-- 板块⑤~⑨ 折叠占位 -->
+      <div class="plan-card" style="width:100%;text-align:center;padding:18px;color:var(--muted);font-size:12px;background:var(--soft);">
+        ⑤ 材质/工艺图 · ⑥ 尺寸/规格图 · ⑦ 对比图 · ⑧ 资质/保障图 · ⑨ 促销收尾图<br>
+        <span style="font-size:11px;">（原型省略，结构同上：提示词 + 文案包 + 文案入图开关 + 填入生图）</span>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /main 详情图策划 -->
 
 <!-- ====== 详情弹窗（点击卡片弹出） ====== -->
 <div class="modal-overlay" id="detailModal" onclick="closeDetail(event)">
@@ -639,6 +922,71 @@
   }
   // ESC 关闭弹窗
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail({target:document.body});});
+
+  // ====== 主导航：生图工作台 ↔ 详情图策划 ======
+  function switchPage(page){
+    document.getElementById('navGen').classList.toggle('active', page==='gen');
+    document.getElementById('navPlan').classList.toggle('active', page==='plan');
+    document.getElementById('pageGen').classList.toggle('hidden', page!=='gen');
+    document.getElementById('pagePlan').classList.toggle('hidden', page!=='plan');
+  }
+
+  // ====== 策划器：复制文案 ======
+  function copyText(t){
+    navigator.clipboard?.writeText(t).then(()=>alert('已复制：'+t)).catch(()=>{
+      const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+      alert('已复制：'+t);
+    });
+  }
+
+  // ====== 策划器：文案入图开关（主标题+副标题+卖点整包拼进提示词，高亮显示） ======
+  function toggleCopy(cb){
+    const card=cb.closest('.plan-card');
+    const box=card.querySelector('.pc-prompt');
+    // 从文案包里把该卡有的文案全部收集（缺哪项自动跳过）
+    const parts=[];
+    card.querySelectorAll('.copy-box .copy-line').forEach(l=>{
+      const k=l.querySelector('.k')?.textContent||'';
+      const v=l.querySelector('.v')?.textContent||'';
+      if(!v) return;
+      if(k.includes('主标题'))      parts.push('主标题「'+v+'」以现代无衬线粗体大字渲染于画面留白区');
+      else if(k.includes('副标题')) parts.push('副标题「'+v+'」以小一号细字置于主标题下方');
+      else if(k.includes('卖点'))   parts.push('底部横排小号字体卖点「'+v+'」');
+    });
+    if(!parts.length) return;
+    const sentence='，画面文字排版：'+parts.join('，')+'，所有文字清晰工整无错别字';
+    const seg=box.querySelector('.title-seg');
+    if(cb.checked){
+      if(!seg){
+        const span=document.createElement('span');
+        span.className='title-seg';
+        span.textContent=sentence;
+        box.appendChild(span);
+      }
+    }else{
+      if(seg) seg.remove();
+    }
+  }
+  // 初始化：默认开着的卡先把文案句拼进 prompt
+  document.querySelectorAll('.plan-card .pc-title-toggle input:checked:not(:disabled)').forEach(cb=>toggleCopy(cb));
+
+  // ====== 策划器：填入生图 ======
+  // 原型演示：假定用户已上传产品图（hasProdImg=true 时自动切图生图并带图）
+  const hasProdImg = true;
+  function fillToGen(name){
+    const card=event.target.closest('.plan-card');
+    const prompt=card.querySelector('.pc-prompt').textContent;
+    switchPage('gen');
+    const genTa=document.querySelector('#form-t2i .textarea');
+    if(genTa) genTa.value=prompt;
+    if(hasProdImg){
+      switchMode('i2i');                     // 自动切到图生图（提示词框共用，已填好）
+      document.getElementById('carriedProdImg')?.classList.remove('hidden'); // 参考图区显示带入的产品图
+      alert('「'+name+'」已填入生图工作台（图生图模式）：\n· 提示词已预填\n· 产品图已自动作为参考图带入\n确认参数后点「开始生成」才扣积分');
+    }else{
+      alert('「'+name+'」提示词已填入生图工作台，确认参数后点「开始生成」才扣积分');
+    }
+  }
 </script>
 </body>
 </html>

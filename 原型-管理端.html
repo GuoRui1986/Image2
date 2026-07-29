@@ -109,9 +109,10 @@
   .bar-fill{height:100%;border-radius:5px;display:flex;align-items:center;
     justify-content:flex-end;padding-right:8px;color:#fff;font-size:11px;
     min-width:0;white-space:nowrap;overflow:hidden;}
-  /* 堆叠条形：image2(蓝) + nano(橙) */
+  /* 堆叠条形：image2(蓝) + nano(橙) + 策划(绿) */
   .fill-gpt{background:#3b6df5;}
   .fill-nano{background:#f59e0b;}
+  .fill-plan{background:#2a9d5a;}
   .bar-row .val{width:70px;text-align:right;font-size:12.5px;color:var(--muted);flex-shrink:0;}
   /* 图例 */
   .legend{display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--muted);}
@@ -144,7 +145,7 @@
       <div class="nav-item" data-page="accounts"><span class="nav-ico">👤</span>账户管理</div>
       <div class="nav-item" data-page="credits"><span class="nav-ico">💰</span>积分管理</div>
       <div class="nav-item" data-page="pricing"><span class="nav-ico">🏷️</span>计费规则</div>
-      <div class="nav-item" data-page="records"><span class="nav-ico">🖼️</span>生图记录</div>
+      <div class="nav-item" data-page="records"><span class="nav-ico">🖼️</span>使用记录</div>
       <div class="nav-item" data-page="logs"><span class="nav-ico">📝</span>操作日志</div>
       <div class="nav-item" data-page="stats"><span class="nav-ico">📈</span>使用统计</div>
     </div>
@@ -158,7 +159,7 @@
         <div class="page-sub">平台整体概览（数据每日更新）</div>
         <div class="stat-grid">
           <div class="stat-card"><div class="label">总消耗积分</div><div class="num">8,640<small>分</small></div><div class="trend">▲ 本周 +1,280</div></div>
-          <div class="stat-card"><div class="label">累计生成</div><div class="num">1,008<small>次</small></div><div class="trend">▲ 本周 +152</div></div>
+          <div class="stat-card"><div class="label">累计生成 / 策划</div><div class="num">1,008<small>次</small> / 86<small>次</small></div><div class="trend">▲ 本周 +152 / +18</div></div>
           <div class="stat-card"><div class="label">活跃用户</div><div class="num">3<small>/3 人</small></div><div class="trend">全员在用</div></div>
           <div class="stat-card"><div class="label">本月失败率</div><div class="num">2.1<small>%</small></div><div class="trend down">▼ 较上月 -0.8%</div></div>
         </div>
@@ -167,15 +168,16 @@
           <div class="legend">
             <span><span style="display:inline-block;width:12px;height:12px;background:#3b6df5;border-radius:3px;"></span> GPT Image 2</span>
             <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:3px;"></span> Nano Banana</span>
+            <span><span style="display:inline-block;width:12px;height:12px;background:#2a9d5a;border-radius:3px;"></span> 详情图策划</span>
           </div>
-          <!-- 堆叠条形：每根柱分 image2(蓝) + nano(橙) -->
-          <div class="bar-row"><div class="name">7-19 周一</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:33%">18</div><div class="bar-fill fill-nano" style="width:55%">30</div></div><div class="val">48 次</div></div>
-          <div class="bar-row"><div class="name">7-20 周二</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:40%">25</div><div class="bar-fill fill-nano" style="width:59%">37</div></div><div class="val">62 次</div></div>
-          <div class="bar-row"><div class="name">7-21 周三</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:35%">22</div><div class="bar-fill fill-nano" style="width:52%">33</div></div><div class="val">55 次</div></div>
-          <div class="bar-row"><div class="name">7-22 周四</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:50%">40</div><div class="bar-fill fill-nano" style="width:50%">40</div></div><div class="val">80 次</div></div>
-          <div class="bar-row"><div class="name">7-23 周五</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:58%">55</div><div class="bar-fill fill-nano" style="width:42%">40</div></div><div class="val">95 次</div></div>
-          <div class="bar-row"><div class="name">7-24 周六</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:18%">9</div><div class="bar-fill fill-nano" style="width:43%">21</div></div><div class="val">30 次</div></div>
-          <div class="bar-row"><div class="name">7-25 周日</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:26%">15</div><div class="bar-fill fill-nano" style="width:45%">26</div></div><div class="val">41 次</div></div>
+          <!-- 堆叠条形：每根柱分 image2(蓝) + nano(橙) + 策划(绿) -->
+          <div class="bar-row"><div class="name">7-19 周一</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:31%">18</div><div class="bar-fill fill-nano" style="width:51%">30</div><div class="bar-fill fill-plan" style="width:6%">3</div></div><div class="val">51 次</div></div>
+          <div class="bar-row"><div class="name">7-20 周二</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:37%">25</div><div class="bar-fill fill-nano" style="width:55%">37</div><div class="bar-fill fill-plan" style="width:7%">5</div></div><div class="val">67 次</div></div>
+          <div class="bar-row"><div class="name">7-21 周三</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:33%">22</div><div class="bar-fill fill-nano" style="width:49%">33</div><div class="bar-fill fill-plan" style="width:5%">2</div></div><div class="val">57 次</div></div>
+          <div class="bar-row"><div class="name">7-22 周四</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:47%">40</div><div class="bar-fill fill-nano" style="width:47%">40</div><div class="bar-fill fill-plan" style="width:6%">4</div></div><div class="val">84 次</div></div>
+          <div class="bar-row"><div class="name">7-23 周五</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:54%">55</div><div class="bar-fill fill-nano" style="width:39%">40</div><div class="bar-fill fill-plan" style="width:7%">6</div></div><div class="val">101 次</div></div>
+          <div class="bar-row"><div class="name">7-24 周六</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:17%">9</div><div class="bar-fill fill-nano" style="width:40%">21</div><div class="bar-fill fill-plan" style="width:4%">1</div></div><div class="val">31 次</div></div>
+          <div class="bar-row"><div class="name">7-25 周日</div><div class="bar-track"><div class="bar-fill fill-gpt" style="width:24%">15</div><div class="bar-fill fill-nano" style="width:42%">26</div><div class="bar-fill fill-plan" style="width:6%">3</div></div><div class="val">44 次</div></div>
         </div>
       </div>
 
@@ -274,11 +276,11 @@
       <!-- ====== 计费规则 ====== -->
       <div class="page hidden" id="page-pricing">
         <div class="page-title">计费规则</div>
-        <div class="page-sub">设置每种生图方式消耗的积分（4 种方式独立配置）</div>
+        <div class="page-sub">设置每种消费类型扣除的积分（4 种生图方式 + 详情图策划，独立配置）</div>
         <div class="block">
-          <div class="block-title"><span class="bar"></span>生图方式 → 扣分设置</div>
+          <div class="block-title"><span class="bar"></span>消费类型 → 扣分设置</div>
           <table>
-            <thead><tr><th>生图方式</th><th>引擎</th><th>每次扣分</th><th>说明</th><th>操作</th></tr></thead>
+            <thead><tr><th>消费类型</th><th>引擎</th><th>每次扣分</th><th>说明</th><th>操作</th></tr></thead>
             <tbody>
               <tr>
                 <td>image2 文生图</td><td><span class="td-muted">GPT Image 2</span></td>
@@ -304,22 +306,44 @@
                 <td class="td-muted">支持多张参考图（最多10张）</td>
                 <td><button class="btn sm primary">保存</button></td>
               </tr>
+              <tr style="background:#fdf9f3;">
+                <td>详情图策划</td><td><span class="td-muted">hy3 + hy-vision</span></td>
+                <td><input class="input" value="5" style="max-width:90px;"></td>
+                <td class="td-muted">出 9 板块提示词+文案，真实成本约 ¥0.05/次</td>
+                <td><button class="btn sm primary">保存</button></td>
+              </tr>
             </tbody>
           </table>
-          <div class="note">仅生图成功后扣减积分；失败不扣分。修改后即时生效，并写入操作日志。</div>
+          <div class="note">仅执行成功后扣减积分；失败不扣分（策划解析失败自动返还）。修改后即时生效，并写入操作日志。</div>
+        </div>
+
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>功能开关</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);max-width:560px;">
+            <div>
+              <div style="font-size:13.5px;font-weight:600;">详情图策划功能</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5;">关闭后用户端「详情图策划」入口置灰并提示"功能维护中"，不影响生图工作台。<br>适用场景：hy3 / hy-vision 接口异常、临时停用等。</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;margin-left:16px;cursor:pointer;">
+              <input type="checkbox" checked style="opacity:0;width:0;height:0;" onchange="togglePlanner(this)">
+              <span class="pl-slider" style="position:absolute;inset:0;background:var(--ok);border-radius:24px;transition:.2s;"></span>
+              <span class="pl-knob" style="position:absolute;top:3px;left:23px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>
+            </label>
+          </div>
+          <div class="note" id="plannerSwitchNote">当前状态：<b style="color:var(--ok);">已启用</b>。开关操作写入操作日志。</div>
         </div>
       </div>
 
       <!-- ====== 生图记录 ====== -->
       <div class="page hidden" id="page-records">
-        <div class="page-title">生图记录</div>
-        <div class="page-sub">查看全部用户的生图记录与积分消耗（结果图仅存 URL，约 5 天过期）</div>
+        <div class="page-title">使用记录</div>
+        <div class="page-sub">查看全部用户的生图与策划记录及积分消耗（结果图仅存 URL，约 5 天过期；策划仅存元数据）</div>
         <div class="filter-row">
           <div class="filter-item"><span class="label">用户</span>
             <select class="input"><option>全部用户</option><option>138****0001</option><option>138****0002</option></select>
           </div>
-          <div class="filter-item"><span class="label">生图方式</span>
-            <select class="input"><option>全部方式</option><option>image2 文生图</option><option>image2 图生图</option><option>nano 文生图</option><option>nano 图生图</option></select>
+          <div class="filter-item"><span class="label">类型</span>
+            <select class="input"><option>全部类型</option><option>image2 文生图</option><option>image2 图生图</option><option>nano 文生图</option><option>nano 图生图</option><option>详情图策划</option></select>
           </div>
           <div class="filter-item"><span class="label">状态</span>
             <select class="input"><option>全部状态</option><option>成功</option><option>失败</option><option>已过期</option></select>
@@ -332,8 +356,15 @@
         </div>
         <div class="block">
           <table>
-            <thead><tr><th>用户</th><th>方式</th><th>提示词</th><th>参考图</th><th>结果图</th><th>扣分</th><th>状态</th><th>时间</th></tr></thead>
+            <thead><tr><th>用户</th><th>类型</th><th>内容摘要</th><th>参考图</th><th>结果图</th><th>扣分</th><th>状态</th><th>时间</th></tr></thead>
             <tbody>
+              <tr style="background:#fdf9f3;">
+                <td>138****0001</td><td><span class="badge" style="background:rgba(232,90,10,.1);color:#e85a0a;">详情图策划</span></td>
+                <td style="max-width:200px;" class="td-muted">商品：316不锈钢智能保温杯 · 深度思考:开 · 产品图:有</td>
+                <td><span class="thumb tiny">品</span></td>
+                <td><span class="td-muted">9 板块提示词</span></td>
+                <td>-5</td><td><span class="badge ok">成功</span></td><td class="td-muted">07-25 15:02</td>
+              </tr>
               <tr>
                 <td>138****0001</td><td class="td-muted">nano 文生图</td>
                 <td style="max-width:200px;" class="td-muted">白色背景电商产品摄影风格红色苹果，柔和自然光…</td>
@@ -364,7 +395,7 @@
               </tr>
             </tbody>
           </table>
-          <div class="note">「参考图」列仅图生图有值（参考图托管方式待定：粘贴 URL 或临时桶）；「已过期」表示多米返回的 URL 超过 5 天失效。</div>
+          <div class="note">「参考图」列仅图生图/策划(传了产品图)有值；「已过期」表示多米返回的 URL 超过 5 天失效。策划记录只存元数据（商品名/参数/消耗/状态），不存 9 板块完整输出——有价值的提示词经「填入生图」后会落在对应生图记录里。</div>
         </div>
       </div>
 
@@ -376,6 +407,7 @@
           <table>
             <thead><tr><th>时间</th><th>管理员</th><th>动作</th><th>对象</th><th>详情</th></tr></thead>
             <tbody>
+              <tr><td class="td-muted">07-25 18:22</td><td>138****0000</td><td>功能开关</td><td>详情图策划</td><td class="td-muted">停用 → 启用</td></tr>
               <tr><td class="td-muted">07-25 10:30</td><td>138****0000</td><td>充值积分</td><td>138****0001</td><td class="td-muted">+500（备注：7月额度）</td></tr>
               <tr><td class="td-muted">07-24 16:10</td><td>138****0000</td><td>修改计费</td><td>计费规则</td><td class="td-muted">nano 图生图 10 → 14</td></tr>
               <tr><td class="td-muted">07-23 09:02</td><td>138****0000</td><td>冻结账户</td><td>138****0002</td><td class="td-muted">原因：暂离项目</td></tr>
@@ -397,11 +429,21 @@
           <div class="stat-card"><div class="label">成功 / 失败</div><div class="num">986 / 22</div></div>
         </div>
         <div class="block">
-          <div class="block-title"><span class="bar"></span>各生图方式使用量</div>
+          <div class="block-title"><span class="bar"></span>各消费类型使用量</div>
           <div class="bar-row"><div class="name">nano 文生图</div><div class="bar-track"><div class="bar-fill" style="width:88%">440 次</div></div><div class="val">4,400 分</div></div>
           <div class="bar-row"><div class="name">image2 文生图</div><div class="bar-track"><div class="bar-fill" style="width:64%">320 次</div></div><div class="val">3,200 分</div></div>
           <div class="bar-row"><div class="name">nano 图生图</div><div class="bar-track"><div class="bar-fill" style="width:32%">160 次</div></div><div class="val">2,240 分</div></div>
           <div class="bar-row"><div class="name">image2 图生图</div><div class="bar-track"><div class="bar-fill" style="width:18%">88 次</div></div><div class="val">1,056 分</div></div>
+          <div class="bar-row"><div class="name">详情图策划</div><div class="bar-track"><div class="bar-fill fill-plan" style="width:17%">86 次</div></div><div class="val">430 分</div></div>
+        </div>
+        <div class="block">
+          <div class="block-title"><span class="bar"></span>策划 → 生图转化</div>
+          <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:0;">
+            <div class="stat-card"><div class="label">策划总次数</div><div class="num">86<small>次</small></div></div>
+            <div class="stat-card"><div class="label">经「填入生图」产生的生图</div><div class="num">312<small>张</small></div></div>
+            <div class="stat-card"><div class="label">平均每次策划带动生图</div><div class="num">3.6<small>张</small></div></div>
+          </div>
+          <div class="note">统计「填入生图」来源标记的生图记录，反映策划功能对生图量的带动效果。</div>
         </div>
         <div class="block">
           <div class="block-title"><span class="bar"></span>各用户消耗排名</div>
@@ -434,6 +476,20 @@
   }
   function closeAdjust(){
     document.getElementById('adjustModal').classList.remove('show');
+  }
+
+  // 详情图策划功能开关
+  function togglePlanner(cb){
+    const slider=cb.parentElement.querySelector('.pl-slider');
+    const knob=cb.parentElement.querySelector('.pl-knob');
+    const note=document.getElementById('plannerSwitchNote');
+    if(cb.checked){
+      slider.style.background='var(--ok)'; knob.style.left='23px';
+      note.innerHTML='当前状态：<b style="color:var(--ok);">已启用</b>。开关操作写入操作日志。';
+    }else{
+      slider.style.background='#c4cad4'; knob.style.left='3px';
+      note.innerHTML='当前状态：<b style="color:var(--fail);">已停用</b> —— 用户端「详情图策划」入口已置灰。开关操作写入操作日志。';
+    }
   }
 </script>
 </body>
