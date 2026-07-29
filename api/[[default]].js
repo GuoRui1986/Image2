@@ -796,7 +796,28 @@ async function fetchUsersLite() {
 }
 
 async function listGenLogs(c) {
-  const { user_id, method, status, days } = c.req.query();
+  const { user_id, method, status, days, type } = c.req.query();
+  const users = await fetchUsersLite();
+  const umap = Object.fromEntries(users.map((u) => [u.id, u.phone]));
+  if (type === 'planner') {
+    let q = supabase
+      .from('planner_logs')
+      .select('id, user_id, product_name, style, thinking, has_image, cost, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    if (user_id) q = q.eq('user_id', user_id);
+    if (status) q = q.eq('status', status);
+    const d = Number(days);
+    if (Number.isFinite(d) && d > 0) q = q.gte('created_at', new Date(Date.now() - d * 86400000).toISOString());
+    const { data, error } = await q;
+    if (error) return c.json({ code: 500, msg: error.message }, 500);
+    const rows = (data || []).map((p) => ({
+      rec_type: 'planner', id: p.id, user_id: p.user_id, phone: umap[p.user_id] || p.user_id,
+      product_name: p.product_name, style: p.style, thinking: !!p.thinking, has_image: !!p.has_image,
+      cost: p.cost, status: p.status, created_at: p.created_at,
+    }));
+    return c.json({ code: 200, data: rows });
+  }
   let q = supabase
     .from('generation_logs')
     .select('id, task_id, user_id, method, prompt, cost, status, created_at, result_image, ref_images')
@@ -811,9 +832,7 @@ async function listGenLogs(c) {
   }
   const { data, error } = await q;
   if (error) return c.json({ code: 500, msg: error.message }, 500);
-  const users = await fetchUsersLite();
-  const umap = Object.fromEntries(users.map((u) => [u.id, u.phone]));
-  const rows = (data || []).map((g) => ({ ...g, phone: umap[g.user_id] || g.user_id }));
+  const rows = (data || []).map((g) => ({ rec_type: 'gen', ...g, phone: umap[g.user_id] || g.user_id }));
   return c.json({ code: 200, data: rows });
 }
 
@@ -841,10 +860,12 @@ async function fetchGenLogsLite() {
 }
 
 async function dashboardHandler(c) {
-  let logs, users;
+  let logs, users, plogs;
   try {
     logs = await fetchGenLogsLite();
     users = await fetchUsersLite();
+    const pr = await supabase.from('planner_logs').select('status, cost, created_at').limit(5000);
+    plogs = pr.data || [];
   } catch (e) {
     return c.json({ code: 500, msg: e.message }, 500);
   }
@@ -861,7 +882,7 @@ async function dashboardHandler(c) {
   for (let i = 6; i >= 0; i--) {
     const dt = new Date(now.getTime() - i * 86400000);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-    const row = { key, label: `${dt.getMonth() + 1}-${dt.getDate()}`, image2: 0, nano: 0, total: 0 };
+    const row = { key, label: `${dt.getMonth() + 1}-${dt.getDate()}`, image2: 0, nano: 0, total: 0, planner: 0 };
     days.push(row); dayMap[key] = row;
   }
 
@@ -877,11 +898,19 @@ async function dashboardHandler(c) {
     }
   });
 
+  let plannerCount = 0;
+  plogs.forEach((p) => {
+    if (p.status === 'success') plannerCount++;
+    const key = (p.created_at || '').slice(0, 10);
+    if (dayMap[key]) dayMap[key].planner++;
+  });
+
   return c.json({
     code: 200,
     data: {
       total_cost: totalCost,
       total_count: logs.length,
+      planner_count: plannerCount,
       active_users: activeUsers,
       total_users: alive.length,
       month_fail_rate: mTotal ? +((mFail / mTotal) * 100).toFixed(1) : 0,
@@ -891,10 +920,12 @@ async function dashboardHandler(c) {
 }
 
 async function statsHandler(c) {
-  let logs, users;
+  let logs, users, plogs;
   try {
     logs = await fetchGenLogsLite();
     users = await fetchUsersLite();
+    const pr = await supabase.from('planner_logs').select('user_id, status, cost').limit(5000);
+    plogs = pr.data || [];
   } catch (e) {
     return c.json({ code: 500, msg: e.message }, 500);
   }
@@ -902,6 +933,11 @@ async function statsHandler(c) {
   let totalCost = 0, success = 0, fail = 0;
   const methods = {};
   const perUser = {};
+  let plannerCount = 0, plannerSuccess = 0, plannerCost = 0;
+  plogs.forEach((p) => {
+    plannerCount++;
+    if (p.status === 'success') { plannerSuccess++; plannerCost += p.cost || 0; }
+  });
   logs.forEach((g) => {
     if (g.status === 'success') { success++; totalCost += g.cost || 0; }
     else if (g.status === 'fail') fail++;
@@ -916,6 +952,8 @@ async function statsHandler(c) {
   const ranking = Object.entries(perUser)
     .map(([uid, cost]) => ({ phone: umap[uid]?.phone || uid, cost }))
     .sort((a, b) => b.cost - a.cost);
+  const methodsArr = Object.values(methods).sort((a, b) => b.count - a.count);
+  if (plannerCount > 0) methodsArr.push({ method: 'detail_planner', count: plannerCount, cost: plannerCost });
   return c.json({
     code: 200,
     data: {
@@ -923,8 +961,9 @@ async function statsHandler(c) {
       total_count: logs.length,
       avg_cost: logs.length ? +(totalCost / Math.max(success, 1)).toFixed(1) : 0,
       success, fail,
-      methods: Object.values(methods).sort((a, b) => b.count - a.count),
+      methods: methodsArr,
       ranking,
+      planner: { count: plannerCount, success: plannerSuccess, cost: plannerCost },
     },
   });
 }

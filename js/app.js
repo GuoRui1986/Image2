@@ -39,20 +39,22 @@ function route() {
   $('#view-login').style.display = (!loggedIn && h === '#/login') ? 'block' : 'none';
   $('#view-user').style.display = (loggedIn && h === '#/user') ? 'block' : 'none';
   $('#view-admin').style.display = (loggedIn && h === '#/admin') ? 'block' : 'none';
+  $('#view-planner').style.display = (loggedIn && h === '#/planner') ? 'block' : 'none';
 
   if (loggedIn && state.user) {
     $('#hdr-phone').textContent = state.user.phone;
     $('#hdr-balance').textContent = state.user.balance;
     $('#hdr-role').textContent = state.user.role === 'admin' ? '管理员' : '用户';
-    $('#btn-to-user').style.display = (h !== '#/user') ? 'inline-block' : 'none';
+    $('#btn-to-user').style.display = (h !== '#/user' && h !== '#/planner') ? 'inline-block' : 'none';
     $('#btn-to-admin').style.display = (state.user.role === 'admin' && h !== '#/admin') ? 'inline-block' : 'none';
     const vt = $('#hdr-view-tag');
     vt.style.display = 'inline-block';
-    vt.textContent = h === '#/admin' ? '管理端' : '用户端';
+    vt.textContent = h === '#/admin' ? '管理端' : (h === '#/planner' ? '详情图策划' : '用户端');
   } else {
     $('#hdr-view-tag').style.display = 'none';
   }
   if (loggedIn && h === '#/admin' && state.user?.role === 'admin') loadAdminAll();
+  if (loggedIn && h === '#/user') loadPlannerStatus();
 }
 
 // ---------- 登录 ----------
@@ -259,6 +261,7 @@ const METHOD_META = {
   image2_i2i: { name: 'image2 图生图', engine: 'GPT Image 2', note: '带参考图，略高于文生图' },
   nano_t2i: { name: 'nano 文生图', engine: 'Nano Banana', note: '真实成本约 ¥0.07/次' },
   nano_i2i: { name: 'nano 图生图', engine: 'Nano Banana', note: '支持多张参考图（最多10张）' },
+  detail_planner: { name: '详情图策划器', engine: 'hy3', note: '每次生成 9 板块提示词' },
 };
 const mName = (m) => METHOD_META[m]?.name || m;
 const STATUS_BADGE = {
@@ -295,15 +298,18 @@ async function loadDash() {
     <div class="stat-card"><div class="label">总消耗积分</div><div class="num">${d.total_cost.toLocaleString()}<small>分</small></div></div>
     <div class="stat-card"><div class="label">累计生成</div><div class="num">${d.total_count.toLocaleString()}<small>次</small></div></div>
     <div class="stat-card"><div class="label">活跃用户</div><div class="num">${d.active_users}<small>/${d.total_users} 人</small></div></div>
-    <div class="stat-card"><div class="label">本月失败率</div><div class="num">${d.month_fail_rate}<small>%</small></div></div>`;
-  const max = Math.max(1, ...d.trend.map(t => t.total));
+    <div class="stat-card"><div class="label">本月失败率</div><div class="num">${d.month_fail_rate}<small>%</small></div></div>
+    <div class="stat-card planner-stat"><div class="label">累计策划</div><div class="num">${(d.planner_count || 0).toLocaleString()}<small>次</small></div></div>`;
+  const max = Math.max(1, ...d.trend.map(t => t.total + (t.planner || 0)));
   $('#dash-trend').innerHTML = d.trend.map(t => {
     const wg = Math.round((t.image2 / max) * 100);
     const wn = Math.round((t.nano / max) * 100);
+    const wp = Math.round(((t.planner || 0) / max) * 100);
     return `<div class="bar-row"><div class="name">${t.label}</div><div class="bar-track">
       ${t.image2 ? `<div class="bar-fill fill-gpt" style="width:${wg}%">${t.image2}</div>` : ''}
       ${t.nano ? `<div class="bar-fill fill-nano" style="width:${wn}%">${t.nano}</div>` : ''}
-    </div><div class="val">${t.total} 次</div></div>`;
+      ${t.planner ? `<div class="bar-fill fill-planner" style="width:${wp}%">${t.planner}</div>` : ''}
+    </div><div class="val">${t.total + (t.planner || 0)} 次</div></div>`;
   }).join('');
 }
 
@@ -432,7 +438,20 @@ async function loadPricing() {
     }));
     tb.appendChild(tr);
   });
+  loadConfigSwitch();
 }
+async function loadConfigSwitch() {
+  const { body } = await api('/api/admin/config');
+  if (body.code !== 200) return;
+  const sw = $('#cfg-planner');
+  if (sw) { sw.checked = !!body.data.planner_enabled; $('#cfg-planner-state').textContent = body.data.planner_enabled ? '已启用' : '已停用'; }
+}
+$('#cfg-planner')?.addEventListener('change', async (e) => {
+  const val = e.target.checked;
+  const { body } = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ planner_enabled: val }) });
+  if (body.code !== 200) { alert(body.msg || '操作失败'); e.target.checked = !val; return; }
+  $('#cfg-planner-state').textContent = val ? '已启用' : '已停用';
+});
 
 // ----- 生图记录 -----
 let genLogCache = [];
@@ -450,8 +469,10 @@ async function loadFilterUsers() {
 async function loadGenLogs() {
   loadFilterUsers();
   const qs = new URLSearchParams();
+  const method = $('#flt-method').value;
   if ($('#flt-user').value) qs.set('user_id', $('#flt-user').value);
-  if ($('#flt-method').value) qs.set('method', $('#flt-method').value);
+  if (method === 'detail_planner') qs.set('type', 'planner');
+  else if (method) qs.set('method', method);
   if ($('#flt-status').value) qs.set('status', $('#flt-status').value);
   if ($('#flt-days').value) qs.set('days', $('#flt-days').value);
   const { body } = await api('/api/admin/logs/generation?' + qs.toString());
@@ -460,6 +481,18 @@ async function loadGenLogs() {
   const tb = $('#genlog-table tbody'); tb.innerHTML = '';
   body.data.forEach(g => {
     const tr = document.createElement('tr');
+    if (g.rec_type === 'planner') {
+      tr.innerHTML = `<td><span class="user-cell"><svg class="user-ico"><use href="#i-user"/></svg>${esc(g.phone)}</span></td>
+        <td class="td-muted">详情图策划</td>
+        <td class="td-muted prompt-cell" title="${esc(g.product_name)}">${esc((g.product_name || '').slice(0, 40))}</td>
+        <td class="td-muted">${g.has_image ? '有' : '无'}</td>
+        <td class="td-muted">9 板块提示词</td>
+        <td>${g.cost ? '-' + g.cost : 0}</td>
+        <td>${STATUS_BADGE[g.status] || esc(g.status)}</td>
+        <td class="td-muted">${(g.created_at || '').slice(5, 16).replace('T', ' ')}</td>`;
+      tb.appendChild(tr);
+      return;
+    }
     const refs = Array.isArray(g.ref_images) && g.ref_images.length
       ? `<span class="thumb-ph">参×${g.ref_images.length}</span>` : '<span class="td-muted">—</span>';
     const result = g.result_image
@@ -481,16 +514,28 @@ async function loadGenLogs() {
 $('#btn-filter').addEventListener('click', loadGenLogs);
 $('#btn-export').addEventListener('click', () => {
   if (!genLogCache.length) { alert('无可导出数据'); return; }
-  const head = ['用户', '方式', '提示词', '参考图数', '结果图URL', '扣分', '状态', '时间'];
-  const lines = [head.join(',')].concat(genLogCache.map(g => [
-    g.phone, mName(g.method), '"' + (g.prompt || '').replace(/"/g, '""') + '"',
-    Array.isArray(g.ref_images) ? g.ref_images.length : 0,
-    g.result_image || '', g.cost, g.status, g.created_at,
-  ].join(',')));
+  const isPlanner = genLogCache[0]?.rec_type === 'planner';
+  let head, lines, fname;
+  if (isPlanner) {
+    head = ['用户', '商品名', '带图', '深度思考', '扣分', '状态', '时间'];
+    lines = [head.join(',')].concat(genLogCache.map(g => [
+      g.phone, '"' + (g.product_name || '').replace(/"/g, '""') + '"',
+      g.has_image ? '有' : '无', g.thinking ? '是' : '否', g.cost, g.status, g.created_at,
+    ].join(',')));
+    fname = '策划记录';
+  } else {
+    head = ['用户', '方式', '提示词', '参考图数', '结果图URL', '扣分', '状态', '时间'];
+    lines = [head.join(',')].concat(genLogCache.map(g => [
+      g.phone, mName(g.method), '"' + (g.prompt || '').replace(/"/g, '""') + '"',
+      Array.isArray(g.ref_images) ? g.ref_images.length : 0,
+      g.result_image || '', g.cost, g.status, g.created_at,
+    ].join(',')));
+    fname = '生图记录';
+  }
   const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '生图记录-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.download = fname + '-' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click(); URL.revokeObjectURL(a.href);
 });
 
@@ -523,12 +568,18 @@ async function loadStats() {
     <div class="stat-card"><div class="label">总消耗</div><div class="num">${d.total_cost.toLocaleString()}<small>分</small></div></div>
     <div class="stat-card"><div class="label">总生成次数</div><div class="num">${d.total_count.toLocaleString()}<small>次</small></div></div>
     <div class="stat-card"><div class="label">平均单次成本</div><div class="num">${d.avg_cost}<small>分</small></div></div>
-    <div class="stat-card"><div class="label">成功 / 失败</div><div class="num">${d.success} / ${d.fail}</div></div>`;
+    <div class="stat-card"><div class="label">成功 / 失败</div><div class="num">${d.success} / ${d.fail}</div></div>
+    <div class="stat-card planner-stat"><div class="label">累计策划</div><div class="num">${(d.planner?.count || 0).toLocaleString()}<small>次</small></div></div>`;
   const maxC = Math.max(1, ...d.methods.map(m => m.count));
   $('#stats-methods').innerHTML = d.methods.map(m => `
     <div class="bar-row"><div class="name">${mName(m.method)}</div>
-      <div class="bar-track"><div class="bar-fill fill-gpt" style="width:${Math.max(6, Math.round((m.count / maxC) * 100))}%">${m.count} 次</div></div>
+      <div class="bar-track"><div class="bar-fill ${m.method === 'detail_planner' ? 'fill-planner' : 'fill-gpt'}" style="width:${Math.max(6, Math.round((m.count / maxC) * 100))}%">${m.count} 次</div></div>
       <div class="val">${m.cost.toLocaleString()} 分</div></div>`).join('') || '<div class="td-muted">暂无数据</div>';
+  const pl = d.planner || { count: 0, success: 0, cost: 0 };
+  $('#stats-planner').innerHTML = `
+    <div class="rank"><div class="no ${pl.count > 0 ? 'top' : ''}">★</div>
+      <div class="who">策划次数 <b>${pl.count}</b>（成功 ${pl.success}）</div><div class="score">${pl.cost.toLocaleString()} 分</div></div>
+    <div class="note">策划器产出 9 板块提示词，需用户手动「填入生图」，故「策划→生图」转化不自动统计。</div>`;
   $('#stats-ranking').innerHTML = d.ranking.map((r, i) => `
     <div class="rank"><div class="no ${i < 3 ? 'top' : ''}">${i + 1}</div>
       <div class="who">${esc(r.phone)}</div><div class="score">${r.cost.toLocaleString()} 分</div></div>`).join('') || '<div class="td-muted">暂无消耗记录</div>';
@@ -551,3 +602,195 @@ if (state.token) {
     } else { logout(); }
   }).catch(() => logout());
 } else { route(); }
+
+// ===================== 详情图策划器 (Phase 8) =====================
+state.plannerImage = null; // { base64: 完整 dataURL, mime }
+
+$('#btn-to-planner').addEventListener('click', () => { location.hash = '#/planner'; route(); });
+$('#pl-back').addEventListener('click', () => { location.hash = '#/user'; route(); });
+
+// 功能开关：入口置灰
+function loadPlannerStatus() {
+  api('/api/planner/status').then(({ body }) => {
+    const entry = $('#planner-entry');
+    if (body.code === 200 && body.data.enabled) {
+      entry.classList.remove('disabled');
+    } else {
+      entry.classList.add('disabled');
+      $('#btn-to-planner').textContent = '功能维护中';
+      $('#btn-to-planner').disabled = true;
+    }
+  }).catch(() => {});
+}
+
+// 产品图上传（点击 + 拖拽）
+const plImgInput = $('#pl-img-input');
+$('#pl-img-drop').addEventListener('click', () => plImgInput.click());
+$('#pl-img-drop').addEventListener('dragover', (e) => { e.preventDefault(); $('#pl-img-drop').classList.add('dragover'); });
+$('#pl-img-drop').addEventListener('dragleave', () => $('#pl-img-drop').classList.remove('dragover'));
+$('#pl-img-drop').addEventListener('drop', (e) => {
+  e.preventDefault(); $('#pl-img-drop').classList.remove('dragover');
+  if (e.dataTransfer.files.length) handlePlImage(e.dataTransfer.files[0]);
+});
+plImgInput.addEventListener('change', (e) => { if (e.target.files.length) handlePlImage(e.target.files[0]); });
+async function handlePlImage(f) {
+  state.plannerImage = { base64: await fileToDataUrl(f), mime: f.type };
+  $('#pl-img-thumb').src = state.plannerImage.base64;
+  $('#pl-img-preview').style.display = 'flex';
+  $('#pl-img-drop').style.display = 'none';
+  $('#pl-img-state').textContent = '已上传，AI 分析中…';
+  try {
+    const { body } = await post('/api/planner/analyze', {
+      image_base64: state.plannerImage.base64.split(',')[1],
+      image_mime: f.type,
+    });
+    if (body.code === 200 && body.data.analysis) {
+      const cur = $('#pl-selling').value.trim();
+      $('#pl-selling').value = cur ? cur + '\n' + body.data.analysis : body.data.analysis;
+    }
+  } catch (_) { /* 分析失败不阻断主流程 */ }
+  $('#pl-img-state').textContent = '已上传';
+}
+function fileToDataUrl(f) {
+  return new Promise((res) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.readAsDataURL(f);
+  });
+}
+$('#pl-img-remove').addEventListener('click', () => {
+  state.plannerImage = null;
+  $('#pl-img-input').value = '';
+  $('#pl-img-preview').style.display = 'none';
+  $('#pl-img-drop').style.display = 'block';
+});
+
+// 提交生成策划
+$('#pl-submit').addEventListener('click', async () => {
+  const btn = $('#pl-submit'); const msg = $('#pl-msg'); msg.className = 'msg';
+  const product_name = $('#pl-name').value.trim();
+  const category = $('#pl-category').value.trim();
+  if (!product_name || !category) { msg.textContent = '商品名与类目必填（标 *）'; msg.classList.add('err'); return; }
+  const payload = {
+    product_name, category,
+    selling_points: $('#pl-selling').value.trim(),
+    style: $('#pl-style').value.trim(),
+    platform: $('#pl-platform').value,
+    brand: $('#pl-brand').value.trim(),
+    thinking: $('#pl-thinking').checked,
+  };
+  if (state.plannerImage) {
+    payload.image_base64 = state.plannerImage.base64.split(',')[1];
+    payload.image_mime = state.plannerImage.mime;
+  }
+  btn.disabled = true; btn.classList.add('loading');
+  btn.innerHTML = '<svg class="ico-btn"><use href="#i-zap"/></svg> 生成中…';
+  try {
+    const { body } = await post('/api/planner', payload);
+    if (body.code !== 200) {
+      msg.textContent = body.msg || '生成失败'; msg.classList.add('err');
+      return;
+    }
+    renderPlannerResult(body.data);
+    msg.textContent = '已生成 9 板块提示词'; msg.classList.add('ok');
+  } catch (e) {
+    msg.textContent = e.message; msg.classList.add('err');
+  } finally {
+    btn.disabled = false; btn.classList.remove('loading');
+    btn.innerHTML = '<svg class="ico-btn"><use href="#i-zap"/></svg> 生成策划';
+  }
+});
+
+function renderPlannerResult(d) {
+  $('#pl-analysis').style.display = d.analysis ? 'block' : 'none';
+  if (d.analysis) $('#pl-analysis').innerHTML =
+    `<div class="pl-analysis-head">AI 产品分析</div><div class="pl-analysis-body">${esc(d.analysis)}</div>`;
+  const rb = $('#pl-reasoning');
+  if (d.reasoning && d.reasoning.trim()) {
+    rb.style.display = 'block';
+    $('#pl-reasoning-body').textContent = d.reasoning;
+  } else { rb.style.display = 'none'; }
+  const cards = $('#pl-cards'); cards.innerHTML = '';
+  (d.sections || []).forEach((s, i) => renderPlannerCard(cards, s, i));
+}
+
+function renderPlannerCard(cards, s, idx) {
+  s._copyIn = false;
+  const card = document.createElement('div'); card.className = 'pl-card';
+  const copy = s.copy || {};
+  const copyRows = [
+    { label: '主标题', text: copy.title },
+    { label: '副标题', text: copy.subtitle },
+    ...(copy.points || []).map((p) => ({ label: '卖点', text: p })),
+  ].filter((r) => r.text).map((r) =>
+    `<div class="pl-copy-row"><span class="pl-copy-label">${r.label}</span>` +
+    `<span class="pl-copy-text">${esc(r.text)}</span>` +
+    `<button class="btn-sm ghost pl-copy-btn" data-c="${esc(r.text)}">复制</button></div>`
+  ).join('');
+  card.innerHTML = `
+    <div class="pl-card-head">
+      <div class="pl-card-title">${esc(s.name || ('板块 ' + (idx + 1)))}</div>
+      <div class="pl-card-badges">
+        <span class="badge model">${esc(s.model || 'hy3')}</span>
+        ${s.size ? `<span class="badge size">${esc(s.size)}</span>` : ''}
+      </div>
+    </div>
+    <div class="pl-prompt" contenteditable="true">${esc(s.prompt || '')}</div>
+    ${s.note ? `<div class="pl-note">${esc(s.note)}</div>` : ''}
+    ${copyRows ? `<div class="pl-copy">${copyRows}</div>` : ''}
+    <div class="pl-card-foot">
+      <label class="switch sm"><input type="checkbox" class="pl-copy-in"><span class="slider"></span></label>
+      <span class="pl-copy-in-label">文案入图</span>
+      <button class="btn-sm pl-fill">填入生图</button>
+    </div>`;
+  card.querySelectorAll('.pl-copy-btn').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.c); b.textContent = '已复制'; setTimeout(() => (b.textContent = '复制'), 1200); }
+    catch (_) { alert('复制失败，请手动选择'); }
+  }));
+  const promptEl = card.querySelector('.pl-prompt');
+  const copyIn = card.querySelector('.pl-copy-in');
+  copyIn.addEventListener('change', () => {
+    s._copyIn = copyIn.checked;
+    card.classList.toggle('copy-in', copyIn.checked);
+    promptEl.classList.toggle('with-copy', copyIn.checked);
+  });
+  card.querySelector('.pl-fill').addEventListener('click', async () => {
+    let p = promptEl.textContent.trim();
+    if (copyIn.checked && (copy.title || copy.subtitle || (copy.points || []).length)) {
+      const parts = [copy.title, copy.subtitle, ...(copy.points || [])].filter(Boolean);
+      p += '\n文案：' + parts.join('，');
+    }
+    await fillToGenerate(p, !!state.plannerImage);
+  });
+  cards.appendChild(card);
+}
+
+async function fillToGenerate(finalPrompt, hasImage) {
+  $('#inp-prompt').value = finalPrompt;
+  $('#prompt-count').textContent = finalPrompt.length;
+  $('#sel-mode').value = 'i2i';
+  syncUserControls();
+  $$('#mode-cards .mode-card').forEach((c) => c.classList.toggle('active', c.dataset.mode === 'i2i'));
+  if (hasImage && state.plannerImage) {
+    const [, pure] = state.plannerImage.base64.split(',');
+    const mime = state.plannerImage.mime || 'image/png';
+    const ext = (mime.split('/')[1] || 'png').replace('+xml', '');
+    try {
+      const { body } = await post('/api/upload-ref', { filename: 'product.' + ext, contentBase64: pure });
+      if (body.code === 200) {
+        state.refItems.push({ url: body.data.url, path: body.data.path, name: '产品图' });
+        renderRefs();
+      } else alert('产品图上传失败：' + body.msg);
+    } catch (e) { alert('产品图上传失败：' + e.message); }
+  }
+  location.hash = '#/user'; route();
+  $('#btn-generate').click();
+}
+
+// 思考过程折叠
+$('#pl-reasoning-toggle').addEventListener('click', () => {
+  const body = $('#pl-reasoning-body');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  $('#pl-reasoning-toggle').textContent = '思考过程 ' + (open ? '▴' : '▾');
+});

@@ -67,6 +67,18 @@
     <symbol id="i-stats" viewBox="0 0 24 24">
       <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
     </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>
+    </symbol>
+    <symbol id="i-photo" viewBox="0 0 24 24">
+      <path d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>
+    </symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24">
+      <line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>
+    </symbol>
   </svg>
 
   <!-- 顶栏 -->
@@ -100,6 +112,15 @@
         <div class="panel-head">
           <div class="panel-title"><svg class="ico"><use href="#i-sparkles"/></svg>生图设置</div>
           <div class="panel-sub">调参数，生成精美图片</div>
+        </div>
+
+        <!-- 详情图策划入口 -->
+        <div class="planner-entry" id="planner-entry">
+          <div class="pe-text">
+            <b>电商详情图策划器</b>
+            <div class="pe-sub">填商品信息，AI 一键生成 9 板块生图提示词</div>
+          </div>
+          <button id="btn-to-planner" class="btn-sm">进入策划 →</button>
         </div>
 
         <div class="field">
@@ -268,7 +289,7 @@
         <div class="nav-item" data-page="accounts"><svg class="nav-ico"><use href="#i-user"/></svg>账户管理</div>
         <div class="nav-item" data-page="credits"><svg class="nav-ico"><use href="#i-credit"/></svg>积分管理</div>
         <div class="nav-item" data-page="pricing"><svg class="nav-ico"><use href="#i-pricing"/></svg>计费规则</div>
-        <div class="nav-item" data-page="records"><svg class="nav-ico"><use href="#i-image"/></svg>生图记录</div>
+        <div class="nav-item" data-page="records"><svg class="nav-ico"><use href="#i-image"/></svg>使用记录</div>
         <div class="nav-item" data-page="oplogs"><svg class="nav-ico"><use href="#i-log"/></svg>操作日志</div>
         <div class="nav-item" data-page="stats"><svg class="nav-ico"><use href="#i-stats"/></svg>使用统计</div>
       </nav>
@@ -339,6 +360,15 @@
           <div class="page-title">计费规则</div>
           <div class="page-sub">设置每种生图方式消耗的积分（4 种方式独立配置）</div>
           <div class="block">
+            <div class="block-title"><span class="tbar"></span>功能开关</div>
+            <div class="switch-row">
+              <span class="switch-name">详情图策划器</span>
+              <label class="switch"><input type="checkbox" id="cfg-planner"><span class="slider"></span></label>
+              <span id="cfg-planner-state" class="td-muted"></span>
+            </div>
+            <div class="note">关闭后用户端「详情图策划」入口置灰不可用。</div>
+          </div>
+          <div class="block">
             <div class="block-title"><span class="tbar"></span>生图方式 → 扣分设置</div>
             <table id="pricing-table"><thead><tr>
               <th>生图方式</th><th>引擎</th><th>每次扣分</th><th>说明</th><th>操作</th>
@@ -349,8 +379,8 @@
 
         <!-- 生图记录 -->
         <div class="apage" id="apage-records" style="display:none">
-          <div class="page-title">生图记录</div>
-          <div class="page-sub">查看全部用户的生图记录与积分消耗（结果图仅存 URL，约 5 天过期）</div>
+          <div class="page-title">使用记录</div>
+          <div class="page-sub">生图记录与详情图策划记录（策划结果仅存元数据，不存图）</div>
           <div class="filter-row">
             <div class="filter-item"><span class="flabel-sm">用户</span>
               <select class="finput" id="flt-user"><option value="">全部用户</option></select>
@@ -362,6 +392,7 @@
                 <option value="image2_i2i">image2 图生图</option>
                 <option value="nano_t2i">nano 文生图</option>
                 <option value="nano_i2i">nano 图生图</option>
+                <option value="detail_planner">详情图策划</option>
               </select>
             </div>
             <div class="filter-item"><span class="flabel-sm">状态</span>
@@ -415,12 +446,110 @@
             <div id="stats-methods"></div>
           </div>
           <div class="block">
+            <div class="block-title"><span class="tbar"></span>策划 → 生图转化</div>
+            <div id="stats-planner"></div>
+          </div>
+          <div class="block">
             <div class="block-title"><span class="tbar"></span>各用户消耗排名</div>
             <div id="stats-ranking"></div>
             <div class="note">消耗排名仅统计有消耗的内部用户（管理员不计费）。</div>
           </div>
         </div>
 
+      </main>
+    </div>
+  </section>
+
+  <!-- 详情图策划器 (Phase 8) -->
+  <section id="view-planner" class="view" style="display:none">
+    <div class="layout planner-layout">
+      <!-- 向导 -->
+      <aside class="panel planner-form-panel">
+        <div class="panel-head">
+          <div class="panel-title"><svg class="ico"><use href="#i-target"/></svg>详情图策划</div>
+          <div class="panel-sub">填商品信息，AI 产出 9 板块生图提示词</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">产品图（可选，上传后 AI 自动分析）</label>
+          <div id="pl-img-drop" class="ref-drop planner-img-drop">
+            <input id="pl-img-input" type="file" accept="image/*" hidden />
+            <div class="ref-drop-inner" id="pl-img-inner">
+              <div class="ref-drop-ico"><svg class="ico"><use href="#i-photo"/></svg></div>
+              <div>点击或拖拽商品图到此处</div>
+              <div class="ref-drop-hint">上传后 AI 提炼卖点，带入图生图参考图</div>
+            </div>
+          </div>
+          <div id="pl-img-preview" class="pl-img-preview" style="display:none">
+            <img id="pl-img-thumb" src="" alt="产品图" />
+            <div class="pl-img-meta">
+              <span id="pl-img-state" class="pl-state">已上传</span>
+              <button id="pl-img-remove" class="btn-sm ghost">移除</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">商品名 *</label>
+          <input id="pl-name" class="finput" placeholder="如 纯棉短袖 T 恤" />
+        </div>
+        <div class="field">
+          <label class="field-label">类目 *</label>
+          <input id="pl-category" class="finput" placeholder="如 男装 / 上衣" />
+        </div>
+        <div class="field">
+          <label class="field-label">核心卖点</label>
+          <textarea id="pl-selling" class="finput" rows="2" placeholder="如 透气、不起球、亲肤"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">目标风格</label>
+          <input id="pl-style" class="finput" placeholder="如 简约日系、高级感 ins 风" />
+        </div>
+        <div class="field">
+          <label class="field-label">目标平台</label>
+          <div class="select-wrap sm">
+            <select id="pl-platform">
+              <option value="">不限</option>
+              <option value="淘宝">淘宝</option>
+              <option value="京东">京东</option>
+              <option value="抖音">抖音</option>
+              <option value="小红书">小红书</option>
+              <option value="亚马逊">亚马逊</option>
+            </select>
+            <span class="select-arrow">▾</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">品牌色 / 关键词</label>
+          <input id="pl-brand" class="finput" placeholder="如 莫兰迪色、米白" />
+        </div>
+        <div class="field toggle-field">
+          <span class="toggle-label">深度思考（更讲究但更慢）</span>
+          <label class="switch">
+            <input id="pl-thinking" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <button id="pl-submit" class="btn-generate"><svg class="ico-btn"><use href="#i-zap"/></svg> 生成策划</button>
+        <div id="pl-msg" class="msg"></div>
+      </aside>
+
+      <!-- 结果 -->
+      <main class="panel results-panel">
+        <div class="results-head">
+          <div class="panel-head">
+            <div class="panel-title"><svg class="ico"><use href="#i-image"/></svg>策划结果</div>
+            <div class="panel-sub">9 板块提示词，可编辑后填入生图</div>
+          </div>
+          <button id="pl-back" class="btn-ghost">返回生图工作台</button>
+        </div>
+        <div id="pl-analysis" class="pl-analysis" style="display:none"></div>
+        <div id="pl-reasoning" class="pl-reasoning" style="display:none">
+          <div class="pl-reasoning-head" id="pl-reasoning-toggle">思考过程 ▾</div>
+          <div class="pl-reasoning-body" id="pl-reasoning-body" style="display:none"></div>
+        </div>
+        <div id="pl-cards" class="pl-cards"></div>
       </main>
     </div>
   </section>
