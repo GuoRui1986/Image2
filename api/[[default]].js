@@ -335,7 +335,39 @@ async function analyzeProductImage(base64, mime) {
 }
 
 // 第二段：hy3 出 9 板块
+function extractSections(content) {
+  if (!content) return null;
+  let parsed;
+  try { parsed = JSON.parse(content); } catch { return null; }
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.sections)) return parsed.sections;
+  if (Array.isArray(parsed?.data?.sections)) return parsed.data.sections;
+  return null;
+}
+
+// 第二路：普通 text 出 JSON（json_schema 失败时兜底，thinking 模式尤其容易返回空数组）
+async function planSectionsFallback(userPrompt) {
+  const r = await tokenhubChat({
+    model: 'hy3',
+    temperature: 0.8,
+    max_tokens: 16000,
+    messages: [
+      { role: 'system', content: PLANNER_SYSTEM_PROMPT + '\n\n【输出格式】只输出一个 JSON 对象：{"sections":[{name,prompt,size,model,note,copy:{title,subtitle,points}}]}，共 9 个板块，板块名称严格按清单顺序。不要输出任何解释、markdown 代码块标记或多余字符。' },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+  if (r?.error) throw new Error('hy3 兜底失败：' + JSON.stringify(r.error));
+  const content = r?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('hy3 兜底返回为空');
+  // 容错：去掉可能的 ```json 包裹
+  const cleaned = content.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  const sections = extractSections(cleaned);
+  if (!sections || !sections.length) throw new Error('9 板块结构异常：' + cleaned.slice(0, 200));
+  return sections;
+}
+
 async function planSections(userPrompt, thinking) {
+  // 第一路：json_schema（深度思考时容易返回空数组，失败走兜底）
   const body = {
     model: 'hy3',
     messages: [
@@ -357,17 +389,20 @@ async function planSections(userPrompt, thinking) {
   const content = r?.choices?.[0]?.message?.content;
   const reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
   if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (e) {
-    throw new Error('解析 9 板块失败：' + content.slice(0, 200));
+  let sections = extractSections(content);
+  let lastErr = null;
+  if (!sections || !sections.length) {
+    // 兜底：普通 text 模式再调一次（关闭 thinking，避免再次空数组）
+    try {
+      sections = await planSectionsFallback(userPrompt);
+      console.error('[planner] json_schema 空数组，已切换普通 text 兜底成功');
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  let sections = null;
-  if (Array.isArray(parsed)) sections = parsed;
-  else if (Array.isArray(parsed?.sections)) sections = parsed.sections;
-  else if (Array.isArray(parsed?.data?.sections)) sections = parsed.data.sections;
-  if (!sections || !sections.length) throw new Error('9 板块结构异常：' + content.slice(0, 200));
+  if (!sections || !sections.length) {
+    throw lastErr || new Error('9 板块结构异常：' + content.slice(0, 200));
+  }
   // 按固定顺序对齐 name，防止 LLM 填串
   sections = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
   return { sections, reasoning };
