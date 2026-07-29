@@ -167,16 +167,22 @@ $('#btn-generate').addEventListener('click', async () => {
   }
 
   const N = +$('#inp-count').value;
-  btn.disabled = true;
-  for (let i = 0; i < N; i++) {
-    try {
-      const { body } = await post('/api/generate', payload);
-      if (body.code !== 200) { msg.textContent = '第' + (i + 1) + '张失败：' + body.msg; msg.classList.add('err'); break; }
-      addCard(body.data.task_id, payload.prompt);
-      state.pollQueue.add(body.data.task_id);
-    } catch (e) { msg.textContent = e.message; msg.classList.add('err'); break; }
+  btn.classList.add('loading');
+  state.genPending = (state.genPending || 0) + 1;
+  try {
+    for (let i = 0; i < N; i++) {
+      try {
+        const { body } = await post('/api/generate', payload);
+        if (body.code !== 200) { msg.textContent = '第' + (i + 1) + '张失败：' + body.msg; msg.classList.add('err'); break; }
+        addCard(body.data.task_id, payload.prompt);
+        state.pollQueue.add(body.data.task_id);
+      } catch (e) { msg.textContent = e.message; msg.classList.add('err'); break; }
+    }
+    startPoll();
+  } finally {
+    state.genPending = Math.max(0, (state.genPending || 1) - 1);
+    if (state.genPending === 0) btn.classList.remove('loading');
   }
-  startPoll();
 });
 
 function addCard(taskId, prompt) {
@@ -252,7 +258,6 @@ async function pollTick() {
     } catch (_) {}
   }
   if (state.pollQueue.size === 0) { clearInterval(state.pollTimer); state.pollTimer = null; }
-  $('#btn-generate').disabled = state.pollQueue.size > 0;
 }
 
 // ---------- 管理端 ----------
