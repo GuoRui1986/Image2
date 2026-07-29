@@ -776,6 +776,8 @@ async function fillToGenerate(finalPrompt, hasImage) {
   $('#sel-mode').value = 'i2i';
   syncUserControls();
   $$('#mode-cards .mode-card').forEach((c) => c.classList.toggle('active', c.dataset.mode === 'i2i'));
+  state.refItems = [];
+  renderRefs();
   if (hasImage && state.plannerImage) {
     const [, pure] = state.plannerImage.base64.split(',');
     const mime = state.plannerImage.mime || 'image/png';
@@ -783,13 +785,12 @@ async function fillToGenerate(finalPrompt, hasImage) {
     try {
       const { body } = await post('/api/upload-ref', { filename: 'product.' + ext, contentBase64: pure });
       if (body.code === 200) {
-        state.refItems.push({ url: body.data.url, path: body.data.path, name: '产品图' });
+        state.refItems = [{ url: body.data.url, path: body.data.path, name: '产品图' }];
         renderRefs();
       } else alert('产品图上传失败：' + body.msg);
     } catch (e) { alert('产品图上传失败：' + e.message); }
   }
   location.hash = '#/user'; route();
-  $('#btn-generate').click();
 }
 
 // 思考过程折叠
