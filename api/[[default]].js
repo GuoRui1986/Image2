@@ -260,12 +260,12 @@ async function tokenhubChat(body) {
 const PLANNER_SYSTEM_PROMPT = `你是资深电商详情图视觉策划专家，任务是根据用户提供的商品信息，为固定的 9 个详情图板块各生成一条可直接用于 AI 图像生成模型的提示词。
 
 【硬规则】
-1. 每个板块你要同时产出两样东西：a) 图像生成提示词（prompt 字段）与 b) 营销文案包（copy 字段，含 title 主标题≤10字、subtitle 副标题≤20字、points 卖点短句数组≤3条每条≤15字）。prompt 必须以「用途」起句，明确这是用于[目标平台]电商的[板块类型]商品图（如"淘宝电商主图""抖音电商详情图"），并描述该平台电商图典型特征：淘宝/京东-白底居中、细节清晰；抖音-场景氛围、竖屏生活化；小红书-ins高级感、生活方式化；亚马逊-纯白背景、产品占比大、无文字。在此基础上贯穿五要素：画面主体、场景、光线、构图、风格。
-2. prompt 中禁止出现任何文字渲染指示（文字、字母、数字、logo 均不写进 prompt）——保持纯画面描述（第1条要求的「用途」前缀属画面语境描述，不受此限）；适合放文字的板块在 prompt 中写"预留干净留白区域"。文案是否画进图由前端「文案入图」开关控制：开关打开时前端按 copy 字段自动在提示词末尾拼接排版段（主标题大字 → 副标题小一号 → 卖点底部横排小字 + "所有文字清晰工整无错别字"兜底），你只需保证 copy 文案质量。
+1. 每个板块你要同时产出两样东西：a) 图像生成提示词（prompt 字段，必须以「用途」起句，明确这是用于[目标平台]电商的[板块类型]商品图，例如"淘宝电商主图""抖音电商详情图"，再按五要素描述画面：画面主体、场景、光线、构图、风格）；b) 营销文案包（copy 字段，含 title 主标题≤10字、subtitle 副标题≤20字、points 卖点短句数组≤3条每条≤15字）。
+2. prompt 中禁止出现任何文字渲染指示（文字、字母、数字、logo 均不写进 prompt）——保持纯画面描述；适合放文字的板块在 prompt 中写"预留干净留白区域"。文案是否画进图由前端「文案入图」开关控制：开关打开时前端按 copy 字段自动在提示词末尾拼接排版段（主标题大字 → 副标题小一号 → 卖点底部横排小字 + "所有文字清晰工整无错别字"兜底），你只需保证 copy 文案质量。
 3. 9 个板块的风格、色调、光线必须统一，全部贯穿用户指定的"目标风格"和"品牌色"；文案口吻全套统一，紧扣用户给的核心卖点，禁止编造商品没有的功能参数。
 4. model 字段取值只能是 "image2" 或 "nano"，严格按板块推荐表：主图/场景/细节/材质/对比/促销 → image2；人群/尺寸/资质 → nano。
 5. size 字段按用户的"目标平台"给出宽x高像素（如淘宝主图 800x800、详情 750 宽；抖音 1080x1080；亚马逊 2000x2000）。
-6. prompt 用中文书写，具体、可视化、无空话；每条 60–180 字（含用途前缀）。
+6. prompt 用中文书写，具体、可视化、无空话；每条 60–150 字。
 7. 只按给定 JSON Schema 输出，不输出任何解释、开场白、结尾语。
 
 【9 板块固定清单（顺序、名称不可改）】
@@ -289,7 +289,7 @@ const PLANNER_SCHEMA = {
         additionalProperties: false,
         properties: {
           name: { type: 'string', description: '板块名称，固定为 9 个之一（主图/首图、核心场景图、人群/情绪图、功能细节特写、材质/工艺图、尺寸/规格图、对比图、资质/保障图、促销收尾图）' },
-          prompt: { type: 'string', description: '图像生成提示词，必须以用途起句明确"用于[目标平台]电商的[板块类型]商品图"，并描述该平台电商图典型特征（淘宝/京东白底居中、抖音场景氛围、小红书ins风、亚马逊纯白大图无文字），再贯穿五要素：画面主体、场景、光线、构图、风格；禁止出现文字/字母/数字/logo 渲染指示；用中文，60-180字，具体可视化无空话' },
+          prompt: { type: 'string', description: '图像生成提示词，必须以「用途」起句明确这是用于[目标平台]电商的[板块类型]商品图，再按五要素描述画面：画面主体、场景、光线、构图、风格；禁止出现任何文字/字母/数字/logo 渲染指示；用中文，60-150字，具体可视化无空话' },
           size: { type: 'string', description: '宽x高像素，如 800x800、750x1000、1080x1080、2000x2000，按目标平台给出' },
           model: { type: 'string', description: '取值只能是 image2 或 nano，严格按推荐：主图/场景/细节/材质/对比/促销→image2；人群/尺寸/资质→nano' },
           note: { type: 'string', description: '该板块策划说明或生图注意点，简短一句' },
@@ -335,89 +335,42 @@ async function analyzeProductImage(base64, mime) {
 }
 
 // 第二段：hy3 出 9 板块
-function extractSections(content) {
-  if (!content) return null;
-  let parsed;
-  try { parsed = JSON.parse(content); } catch { return null; }
-  if (Array.isArray(parsed)) return parsed;
-  if (Array.isArray(parsed?.sections)) return parsed.sections;
-  if (Array.isArray(parsed?.data?.sections)) return parsed.data.sections;
-  return null;
-}
-
-// 第二路：普通 text 出 JSON（json_schema 失败时兜底，thinking 模式尤其容易返回空数组）
-async function planSectionsFallback(userPrompt) {
-  const r = await tokenhubChat({
+async function planSections(userPrompt, thinking) {
+  const body = {
     model: 'hy3',
-    temperature: 0.8,
-    max_tokens: 16000,
     messages: [
-      { role: 'system', content: PLANNER_SYSTEM_PROMPT + '\n\n【输出格式】只输出一个 JSON 对象：{"sections":[{name,prompt,size,model,note,copy:{title,subtitle,points}}]}，共 9 个板块，板块名称严格按清单顺序。不要输出任何解释、markdown 代码块标记或多余字符。' },
+      { role: 'system', content: PLANNER_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
-  });
-  if (r?.error) throw new Error('hy3 兜底失败：' + JSON.stringify(r.error));
-  const content = r?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('hy3 兜底返回为空');
-  // 容错：去掉可能的 ```json 包裹
-  const cleaned = content.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-  const sections = extractSections(cleaned);
-  if (!sections || !sections.length) throw new Error('9 板块结构异常：' + cleaned.slice(0, 200));
-  return sections;
-}
-
-async function planSections(userPrompt, thinking) {
-  let content = null, reasoning = '', lastErr = null;
+    response_format: {
+      type: 'json_schema',
+      json_schema: { name: 'detail_sections', schema: PLANNER_SCHEMA },
+    },
+    temperature: 0.8,
+  };
   if (thinking) {
-    // 深度思考模式：json_schema 极易返回空数组，直接走普通 text + 严格格式要求（保留 thinking 推理质量）
-    try {
-      const r = await tokenhubChat({
-        model: 'hy3',
-        temperature: 0.8,
-        max_tokens: 24000,
-        thinking: { type: 'enabled' },
-        messages: [
-          { role: 'system', content: PLANNER_SYSTEM_PROMPT + '\n\n【输出格式】只输出一个 JSON 对象：{"sections":[{name,prompt,size,model,note,copy:{title,subtitle,points}}]}，共 9 个板块，板块名称严格按清单顺序。不要输出任何解释、markdown 代码块标记或多余字符。' },
-          { role: 'user', content: userPrompt },
-        ],
-      });
-      if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
-      content = r?.choices?.[0]?.message?.content;
-      reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
-      if (!content) throw new Error('hy3 返回为空');
-    } catch (e) { lastErr = e; }
-    // 失败兜底到无 thinking 的普通 text
-    if (!extractSections(content)) {
-      try { content = null; const s = await planSectionsFallback(userPrompt); content = JSON.stringify({ sections: s }); reasoning = ''; }
-      catch (e) { lastErr = lastErr || e; }
-    }
-  } else {
-    // 普通模式：json_schema 优先
-    const r = await tokenhubChat({
-      model: 'hy3',
-      temperature: 0.8,
-      response_format: { type: 'json_schema', json_schema: { name: 'detail_sections', schema: PLANNER_SCHEMA } },
-      messages: [
-        { role: 'system', content: PLANNER_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-    });
-    if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
-    content = r?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
-    // json_schema 空数组 → 普通 text 兜底
-    if (!extractSections(content)) {
-      try { const s = await planSectionsFallback(userPrompt); content = JSON.stringify({ sections: s }); }
-      catch (e) { lastErr = e; }
-    }
+    body.thinking = { type: 'enabled' };
+    body.max_tokens = 16000;
   }
-  const sections = extractSections(content);
-  if (!sections || !sections.length) {
-    throw lastErr || new Error('9 板块结构异常：' + (content || '').slice(0, 200));
+  const r = await tokenhubChat(body);
+  if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
+  const content = r?.choices?.[0]?.message?.content;
+  const reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
+  if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    throw new Error('解析 9 板块失败：' + content.slice(0, 200));
   }
+  let sections = null;
+  if (Array.isArray(parsed)) sections = parsed;
+  else if (Array.isArray(parsed?.sections)) sections = parsed.sections;
+  else if (Array.isArray(parsed?.data?.sections)) sections = parsed.data.sections;
+  if (!sections || !sections.length) throw new Error('9 板块结构异常：' + content.slice(0, 200));
   // 按固定顺序对齐 name，防止 LLM 填串
-  const aligned = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
-  return { sections: aligned, reasoning };
+  sections = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
+  return { sections, reasoning };
 }
 
 // ===================== storage =====================
@@ -610,9 +563,17 @@ async function getPlannerEnabled() {
 }
 
 function buildPlannerUserPrompt(b, analysis) {
+  const PLATFORM_HINT = {
+    '淘宝': '平台典型电商图风格：白底或浅纯色背景、产品居中突出、细节清晰、信息层级分明',
+    '京东': '平台典型电商图风格：白底或浅纯色背景、产品居中突出、细节清晰、信息层级分明',
+    '抖音': '平台典型电商图风格：真实使用场景与氛围感、生活化构图、适合竖屏',
+    '小红书': '平台典型电商图风格：ins 风高级感、生活方式化',
+    '亚马逊': '平台典型电商图风格：纯白背景（强制）、产品占画面 85% 以上、无文字无 logo、大图',
+  };
   const sp = [];
   sp.push(`商品名：${b.product_name || ''}；类目：${b.category || ''}；核心卖点：${b.selling_points || ''}；`);
   sp.push(`目标风格：${b.style || ''}；目标平台：${b.platform || ''}；品牌色/关键词：${b.brand || ''}；`);
+  if (b.platform && PLATFORM_HINT[b.platform]) sp.push(`平台要求：${PLATFORM_HINT[b.platform]}；`);
   if (analysis) sp.push(`产品图 AI 分析（看图中提炼）：${analysis}`);
   return sp.join('\n');
 }
