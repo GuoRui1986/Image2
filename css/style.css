@@ -168,6 +168,8 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 
 .form-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .flabel { width: 80px; font-size: 13px; color: #8a92a3; flex-shrink: 0; }
 .finput { flex: 1; max-width: 300px; padding: 7px 11px; border: 1px solid #e5e6eb; border-radius: 7px; font-size: 13px; width: auto; margin: 0; }
+#view-planner .finput,
+#view-planner .select-wrap.sm select { width: 100%; max-width: 100%; box-sizing: border-box; }
 .btn-sm.ghost { background: #fff; color: #1f2329; border: 1px solid #e5e6eb; }
 .btn-sm.ghost:hover { background: #f0f2f5; }
 .btn-sm.danger { background: #fff; color: #c86a58; border: 1px solid rgba(200,106,88,.35); }
