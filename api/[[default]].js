@@ -240,6 +240,139 @@ async function domiQuery(method, taskId) {
   return { status: 'running' };
 }
 
+// ===================== tokenhub (Phase 8 策划器) =====================
+const TOKENHUB_BASE = process.env.TOKENHUB_BASE_URL || 'https://tokenhub.tencentmaas.com';
+const TOKENHUB_KEY = process.env.TOKENHUB_KEY;
+
+async function tokenhubChat(body) {
+  const r = await fetch(`${TOKENHUB_BASE}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${TOKENHUB_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+// 11.5.1 System Prompt 定稿模板（规则不可动，仅措辞可调）
+const PLANNER_SYSTEM_PROMPT = `你是资深电商详情图视觉策划专家，任务是根据用户提供的商品信息，为固定的 9 个详情图板块各生成一条可直接用于 AI 图像生成模型的提示词。
+
+【硬规则】
+1. 每个板块你要同时产出两样东西：a) 图像生成提示词（prompt 字段，只描述画面，必须包含五要素：画面主体、场景、光线、构图、风格）；b) 营销文案包（copy 字段，含 title 主标题≤10字、subtitle 副标题≤20字、points 卖点短句数组≤3条每条≤15字）。
+2. prompt 中禁止出现任何文字渲染指示（文字、字母、数字、logo 均不写进 prompt）——保持纯画面描述；适合放文字的板块在 prompt 中写"预留干净留白区域"。文案是否画进图由前端「文案入图」开关控制：开关打开时前端按 copy 字段自动在提示词末尾拼接排版段（主标题大字 → 副标题小一号 → 卖点底部横排小字 + "所有文字清晰工整无错别字"兜底），你只需保证 copy 文案质量。
+3. 9 个板块的风格、色调、光线必须统一，全部贯穿用户指定的"目标风格"和"品牌色"；文案口吻全套统一，紧扣用户给的核心卖点，禁止编造商品没有的功能参数。
+4. model 字段取值只能是 "image2" 或 "nano"，严格按板块推荐表：主图/场景/细节/材质/对比/促销 → image2；人群/尺寸/资质 → nano。
+5. size 字段按用户的"目标平台"给出宽x高像素（如淘宝主图 800x800、详情 750 宽；抖音 1080x1080；亚马逊 2000x2000）。
+6. prompt 用中文书写，具体、可视化、无空话；每条 60–150 字。
+7. 只按给定 JSON Schema 输出，不输出任何解释、开场白、结尾语。
+
+【9 板块固定清单（顺序、名称不可改）】
+1 主图/首图；2 核心场景图；3 人群/情绪图；4 功能细节特写；5 材质/工艺图；6 尺寸/规格图；7 对比图；8 资质/保障图；9 促销收尾图`;
+
+const PLANNER_NAME_ORDER = [
+  '主图/首图', '核心场景图', '人群/情绪图', '功能细节特写', '材质/工艺图',
+  '尺寸/规格图', '对比图', '资质/保障图', '促销收尾图',
+];
+
+// json_schema：字段 description 双保险（实测 hy3 只靠 schema 会填串字段）
+const PLANNER_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    sections: {
+      type: 'array',
+      description: '固定 9 个详情图板块，顺序不可改变，依次为：主图/首图、核心场景图、人群/情绪图、功能细节特写、材质/工艺图、尺寸/规格图、对比图、资质/保障图、促销收尾图',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          name: { type: 'string', description: '板块名称，固定为 9 个之一（主图/首图、核心场景图、人群/情绪图、功能细节特写、材质/工艺图、尺寸/规格图、对比图、资质/保障图、促销收尾图）' },
+          prompt: { type: 'string', description: '图像生成提示词，只描述画面，必须含五要素：画面主体、场景、光线、构图、风格；禁止出现任何文字/字母/数字/logo 渲染指示；用中文，60-150字，具体可视化无空话' },
+          size: { type: 'string', description: '宽x高像素，如 800x800、750x1000、1080x1080、2000x2000，按目标平台给出' },
+          model: { type: 'string', description: '取值只能是 image2 或 nano，严格按推荐：主图/场景/细节/材质/对比/促销→image2；人群/尺寸/资质→nano' },
+          note: { type: 'string', description: '该板块策划说明或生图注意点，简短一句' },
+          copy: {
+            type: 'object',
+            additionalProperties: false,
+            description: '营销文案包',
+            properties: {
+              title: { type: 'string', description: '主标题，≤10字' },
+              subtitle: { type: 'string', description: '副标题，≤20字' },
+              points: { type: 'array', description: '卖点短句数组，≤3条，每条≤15字', items: { type: 'string' } },
+            },
+            required: ['title', 'subtitle', 'points'],
+          },
+        },
+        required: ['name', 'prompt', 'size', 'model', 'note', 'copy'],
+      },
+    },
+  },
+  required: ['sections'],
+};
+
+// 第一段：hy-vision 看图分析（仅传图时）
+async function analyzeProductImage(base64, mime) {
+  const dataUri = `data:${mime || 'image/png'};base64,${base64}`;
+  const r = await tokenhubChat({
+    model: 'hy-vision-2.0-instruct',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: '请分析这张商品图，输出四部分：1)品类；2)材质与颜色；3)结构特征；4)可提炼的卖点（4-6条）。简洁列出，不要解释。',
+          },
+          { type: 'image_url', image_url: { url: dataUri } },
+        ],
+      },
+    ],
+  });
+  if (r?.error) throw new Error('hy-vision 失败：' + JSON.stringify(r.error));
+  return r?.choices?.[0]?.message?.content || '';
+}
+
+// 第二段：hy3 出 9 板块
+async function planSections(userPrompt, thinking) {
+  const body = {
+    model: 'hy3',
+    messages: [
+      { role: 'system', content: PLANNER_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: { name: 'detail_sections', schema: PLANNER_SCHEMA },
+    },
+    temperature: 0.8,
+  };
+  if (thinking) {
+    body.thinking = { type: 'enabled' };
+    body.max_tokens = 16000;
+  }
+  const r = await tokenhubChat(body);
+  if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
+  const content = r?.choices?.[0]?.message?.content;
+  const reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
+  if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    throw new Error('解析 9 板块失败：' + content.slice(0, 200));
+  }
+  let sections = null;
+  if (Array.isArray(parsed)) sections = parsed;
+  else if (Array.isArray(parsed?.sections)) sections = parsed.sections;
+  else if (Array.isArray(parsed?.data?.sections)) sections = parsed.data.sections;
+  if (!sections || !sections.length) throw new Error('9 板块结构异常：' + content.slice(0, 200));
+  // 按固定顺序对齐 name，防止 LLM 填串
+  sections = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
+  return { sections, reasoning };
+}
+
 // ===================== storage =====================
 const BUCKET = process.env.SUPABASE_TEMP_BUCKET || 'temp-refs';
 
@@ -417,6 +550,128 @@ async function statusQuery(c) {
   }
   await cleanupRefs(log.params?.ref_paths);
   return c.json({ code: 200, data: { status: 'fail', cost: log.cost } });
+}
+
+// ===================== planner (Phase 8 策划器) =====================
+async function getPlannerEnabled() {
+  const { data } = await supabase
+    .from('app_config')
+    .select('value')
+    .eq('key', 'planner_enabled')
+    .maybeSingle();
+  return data?.value === true;
+}
+
+function buildPlannerUserPrompt(b, analysis) {
+  const sp = [];
+  sp.push(`商品名：${b.product_name || ''}；类目：${b.category || ''}；核心卖点：${b.selling_points || ''}；`);
+  sp.push(`目标风格：${b.style || ''}；目标平台：${b.platform || ''}；品牌色/关键词：${b.brand || ''}；`);
+  if (analysis) sp.push(`产品图 AI 分析（看图中提炼）：${analysis}`);
+  return sp.join('\n');
+}
+
+async function plannerHandler(c) {
+  if (!TOKENHUB_KEY) {
+    return c.json({ code: 500, msg: '服务端未配置 TOKENHUB_KEY，策划器不可用' }, 500);
+  }
+  const u = c.get('user');
+  const b = await c.req.json();
+  const { product_name, category, image_base64, thinking } = b;
+  if (!product_name || !product_name.trim() || !category || !category.trim()) {
+    return c.json({ code: 400, msg: '商品名与类目必填' }, 400);
+  }
+
+  const enabled = await getPlannerEnabled();
+  if (!enabled) {
+    return c.json({ code: 403, msg: '详情图策划功能暂停使用' }, 403);
+  }
+
+  // 计费预扣（管理员免费）
+  let cost = 0;
+  if (u.role !== 'admin') {
+    const { data: rule } = await supabase
+      .from('pricing_rules')
+      .select('cost')
+      .eq('type', 'detail_planner')
+      .single();
+    cost = rule?.cost || 5;
+    try {
+      await supabase.rpc('deduct_points', { p_user: u.id, p_amount: cost });
+    } catch (e) {
+      return c.json({ code: 400, msg: '积分不足' }, 400);
+    }
+  }
+
+  const hasImage = !!(image_base64 && image_base64.trim());
+  let analysis = '';
+  let sections = null;
+  let reasoning = '';
+
+  try {
+    if (hasImage) {
+      analysis = await analyzeProductImage(image_base64, b.image_mime);
+    }
+    const r = await planSections(buildPlannerUserPrompt(b, analysis), !!thinking);
+    sections = r.sections;
+    reasoning = r.reasoning;
+  } catch (e) {
+    if (cost > 0) {
+      try { await supabase.rpc('refund_points', { p_user: u.id, p_amount: cost }); }
+      catch (_) { /* 返还失败仅记日志 */ }
+    }
+    await supabase.from('planner_logs').insert({
+      user_id: u.id, product_name, category, platform: b.platform || null,
+      style: b.style || null, brand_color: b.brand || null,
+      thinking: !!thinking, has_image: hasImage, cost, status: 'fail',
+    });
+    return c.json({ code: 502, msg: '策划生成失败：' + e.message }, 502);
+  }
+
+  await supabase.from('planner_logs').insert({
+    user_id: u.id, product_name, category, platform: b.platform || null,
+    style: b.style || null, brand_color: b.brand || null,
+    thinking: !!thinking, has_image: hasImage, cost, status: 'success',
+  });
+
+  return c.json({ code: 200, data: { analysis, reasoning, sections } });
+}
+
+async function plannerAnalyzeHandler(c) {
+  if (!TOKENHUB_KEY) {
+    return c.json({ code: 500, msg: '服务端未配置 TOKENHUB_KEY' }, 500);
+  }
+  const { image_base64, image_mime } = await c.req.json();
+  if (!image_base64 || !image_base64.trim()) {
+    return c.json({ code: 400, msg: '请先上传产品图' }, 400);
+  }
+  try {
+    const analysis = await analyzeProductImage(image_base64, image_mime);
+    return c.json({ code: 200, data: { analysis } });
+  } catch (e) {
+    return c.json({ code: 502, msg: '看图分析失败：' + e.message }, 502);
+  }
+}
+
+async function plannerStatusHandler(c) {
+  const enabled = await getPlannerEnabled();
+  return c.json({ code: 200, data: { enabled } });
+}
+
+async function getConfigHandler(c) {
+  const enabled = await getPlannerEnabled();
+  return c.json({ code: 200, data: { planner_enabled: enabled } });
+}
+
+async function putConfigHandler(c) {
+  const { planner_enabled } = await c.req.json();
+  const val = planner_enabled === true || planner_enabled === 'true';
+  const { error } = await supabase
+    .from('app_config')
+    .update({ value: val, updated_at: new Date().toISOString() })
+    .eq('key', 'planner_enabled');
+  if (error) return c.json({ code: 400, msg: error.message }, 400);
+  await logOp(c.get('user').id, 'toggle_feature', 'config', 'planner_enabled', `策划器功能${val ? '启用' : '停用'}`);
+  return c.json({ code: 200, data: { planner_enabled: val } });
 }
 
 // ===================== admin =====================
@@ -738,5 +993,12 @@ app.get('/api/admin/logs/operation', listOpLogs);
 app.get('/api/admin/dashboard', dashboardHandler);
 app.get('/api/admin/stats', statsHandler);
 app.get('/api/admin/credits', creditsHandler);
+
+// Phase 8 策划器路由
+app.post('/api/planner', authRequired, plannerHandler);
+app.post('/api/planner/analyze', authRequired, plannerAnalyzeHandler);
+app.get('/api/planner/status', authRequired, plannerStatusHandler);
+app.get('/api/admin/config', getConfigHandler);
+app.put('/api/admin/config', putConfigHandler);
 
 export default app;
