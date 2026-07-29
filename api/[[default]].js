@@ -367,45 +367,57 @@ async function planSectionsFallback(userPrompt) {
 }
 
 async function planSections(userPrompt, thinking) {
-  // 第一路：json_schema（深度思考时容易返回空数组，失败走兜底）
-  const body = {
-    model: 'hy3',
-    messages: [
-      { role: 'system', content: PLANNER_SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: { name: 'detail_sections', schema: PLANNER_SCHEMA },
-    },
-    temperature: 0.8,
-  };
+  let content = null, reasoning = '', lastErr = null;
   if (thinking) {
-    body.thinking = { type: 'enabled' };
-    body.max_tokens = 24000;
-  }
-  const r = await tokenhubChat(body);
-  if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
-  const content = r?.choices?.[0]?.message?.content;
-  const reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
-  if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
-  let sections = extractSections(content);
-  let lastErr = null;
-  if (!sections || !sections.length) {
-    // 兜底：普通 text 模式再调一次（关闭 thinking，避免再次空数组）
+    // 深度思考模式：json_schema 极易返回空数组，直接走普通 text + 严格格式要求（保留 thinking 推理质量）
     try {
-      sections = await planSectionsFallback(userPrompt);
-      console.error('[planner] json_schema 空数组，已切换普通 text 兜底成功');
-    } catch (e) {
-      lastErr = e;
+      const r = await tokenhubChat({
+        model: 'hy3',
+        temperature: 0.8,
+        max_tokens: 24000,
+        thinking: { type: 'enabled' },
+        messages: [
+          { role: 'system', content: PLANNER_SYSTEM_PROMPT + '\n\n【输出格式】只输出一个 JSON 对象：{"sections":[{name,prompt,size,model,note,copy:{title,subtitle,points}}]}，共 9 个板块，板块名称严格按清单顺序。不要输出任何解释、markdown 代码块标记或多余字符。' },
+          { role: 'user', content: userPrompt },
+        ],
+      });
+      if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
+      content = r?.choices?.[0]?.message?.content;
+      reasoning = r?.choices?.[0]?.message?.reasoning_content || '';
+      if (!content) throw new Error('hy3 返回为空');
+    } catch (e) { lastErr = e; }
+    // 失败兜底到无 thinking 的普通 text
+    if (!extractSections(content)) {
+      try { content = null; const s = await planSectionsFallback(userPrompt); content = JSON.stringify({ sections: s }); reasoning = ''; }
+      catch (e) { lastErr = lastErr || e; }
+    }
+  } else {
+    // 普通模式：json_schema 优先
+    const r = await tokenhubChat({
+      model: 'hy3',
+      temperature: 0.8,
+      response_format: { type: 'json_schema', json_schema: { name: 'detail_sections', schema: PLANNER_SCHEMA } },
+      messages: [
+        { role: 'system', content: PLANNER_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+    });
+    if (r?.error) throw new Error('hy3 失败：' + JSON.stringify(r.error));
+    content = r?.choices?.[0]?.message?.content;
+    if (!content) throw new Error('hy3 返回为空：' + JSON.stringify(r).slice(0, 300));
+    // json_schema 空数组 → 普通 text 兜底
+    if (!extractSections(content)) {
+      try { const s = await planSectionsFallback(userPrompt); content = JSON.stringify({ sections: s }); }
+      catch (e) { lastErr = e; }
     }
   }
+  const sections = extractSections(content);
   if (!sections || !sections.length) {
-    throw lastErr || new Error('9 板块结构异常：' + content.slice(0, 200));
+    throw lastErr || new Error('9 板块结构异常：' + (content || '').slice(0, 200));
   }
   // 按固定顺序对齐 name，防止 LLM 填串
-  sections = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
-  return { sections, reasoning };
+  const aligned = sections.slice(0, 9).map((s, i) => ({ ...s, name: PLANNER_NAME_ORDER[i] || s.name }));
+  return { sections: aligned, reasoning };
 }
 
 // ===================== storage =====================
