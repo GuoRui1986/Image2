@@ -4,4 +4,6 @@ node_modules/
 .DS_Store
 dist/
 push.bat
+_iga_*.txt
+*.ck.txt
 

@@ -42,6 +42,7 @@ export function parseArgs(argv, spec = {}) {
   if (spec.positionals) {
     spec.positionals.forEach((p, idx) => { out[p] = positionals[idx]; });
   }
+  out._ = positionals;
   return out;
 }
 

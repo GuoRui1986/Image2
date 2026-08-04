@@ -51,4 +51,24 @@ export class Client {
   plannerAnalyze(payload) { return this._req('POST', '/api/planner/analyze', payload); }
   uploadRef(filename, contentBase64) { return this._req('POST', '/api/upload-ref', { filename, contentBase64 }); }
   myLogs(limit) { return this._req('GET', '/api/my/logs?limit=' + (limit || 20)); }
+
+  // ===== 管理端（需 admin 角色，后端 adminRequired 强制校验）=====
+  adminUsers() { return this._req('GET', '/api/admin/users'); }
+  adminCreateUser(payload) { return this._req('POST', '/api/admin/users', payload); }
+  adminUpdateUser(id, payload) { return this._req('PUT', '/api/admin/users/' + id, payload); }
+  adminDeleteUser(id) { return this._req('DELETE', '/api/admin/users/' + id); }
+  adminPricing() { return this._req('GET', '/api/admin/pricing'); }
+  adminUpdatePricing(type, cost) { return this._req('PUT', '/api/admin/pricing/' + type, { cost }); }
+  adminCredits() { return this._req('GET', '/api/admin/credits'); }
+  adminLogsGen(qs = {}) {
+    const p = new URLSearchParams();
+    ['type', 'status', 'method', 'user_id', 'days'].forEach((k) => { if (qs[k]) p.set(k, qs[k]); });
+    const s = p.toString();
+    return this._req('GET', '/api/admin/logs/generation' + (s ? '?' + s : ''));
+  }
+  adminLogsOp() { return this._req('GET', '/api/admin/logs/operation'); }
+  adminDashboard() { return this._req('GET', '/api/admin/dashboard'); }
+  adminStats() { return this._req('GET', '/api/admin/stats'); }
+  adminConfigGet() { return this._req('GET', '/api/admin/config'); }
+  adminConfigSet(plannerEnabled) { return this._req('PUT', '/api/admin/config', { planner_enabled: !!plannerEnabled }); }
 }

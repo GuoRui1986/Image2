@@ -8,6 +8,7 @@ import planCmd from '../src/commands/plan.js';
 import statusCmd from '../src/commands/status.js';
 import creditsCmd from '../src/commands/credits.js';
 import recordsCmd from '../src/commands/records.js';
+import adminCmd from '../src/commands/admin.js';
 
 const COMMANDS = {
   login: loginCmd,
@@ -16,6 +17,7 @@ const COMMANDS = {
   status: statusCmd,
   credits: creditsCmd,
   records: recordsCmd,
+  admin: adminCmd,
 };
 
 const HELP = `imgcli - Rui 生图平台命令行客户端 (零依赖)
@@ -30,6 +32,11 @@ const HELP = `imgcli - Rui 生图平台命令行客户端 (零依赖)
   status <task_id>          查生图任务（--wait 轮询至终态）
   credits                  查剩余积分（走 /api/me）
   records                  我的生图/策划记录（--limit）
+  admin <子命令>           管理端命令（需 admin 角色；写操作必须 --yes）
+                           子命令: users user-add user-update user-del
+                           pricing pricing-set credits logs-gen logs-op
+                           dashboard stats config-get config-set
+                           （输入 imgcli admin 查看完整帮助）
 
 全局选项:
   --json                   输出纯 JSON（agent 友好，退出码 0 成功 / 非0 失败）
@@ -62,7 +69,9 @@ async function main() {
   }
   const auth = loadAuth();
   const baseUrl = global.baseUrl || process.env.IMGCLI_BASE_URL || auth.baseUrl || '';
-  if (!baseUrl && cmd !== 'login') {
+  // admin 仅查看帮助（无子命令 / --help）时无需后端地址
+  const adminHelpOnly = cmd === 'admin' && (args.length === 1 || args[1] === '--help' || args[1] === '-h');
+  if (!baseUrl && cmd !== 'login' && !adminHelpOnly) {
     process.stderr.write('未配置 API 地址。请先设置 IMGCLI_BASE_URL 环境变量，或用 imgcli --base-url <url> login ...\n');
     process.exit(3);
   }
