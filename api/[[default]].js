@@ -1001,6 +1001,44 @@ async function creditsHandler(c) {
   return c.json({ code: 200, data: rows });
 }
 
+// ===================== my logs (CLI 用户级只读) =====================
+async function myLogsHandler(c) {
+  const u = c.get('user');
+  let limit = parseInt(c.req.query('limit') || '20', 10);
+  if (!Number.isFinite(limit) || limit <= 0) limit = 20;
+  limit = Math.min(limit, 100);
+  try {
+    const [{ data: gens, error: e1 }, { data: plans, error: e2 }] = await Promise.all([
+      supabase.from('generation_logs').select('*').eq('user_id', u.id).order('created_at', { ascending: false }).limit(limit),
+      supabase.from('planner_logs').select('*').eq('user_id', u.id).order('created_at', { ascending: false }).limit(limit),
+    ]);
+    if (e1) throw new Error('读取生图记录失败: ' + e1.message);
+    if (e2) throw new Error('读取策划记录失败: ' + e2.message);
+    const genRows = (gens || []).map((g) => ({
+      type: 'generation',
+      title: (g.prompt || '').slice(0, 40),
+      method: g.method || '',
+      time: g.created_at,
+      cost: g.cost,
+      status: g.status,
+      url: g.status === 'success' ? (g.result_image || null) : null,
+    }));
+    const planRows = (plans || []).map((p) => ({
+      type: 'planner',
+      title: `${p.product_name || ''}/${p.category || ''}`,
+      time: p.created_at,
+      cost: p.cost,
+      status: p.status,
+    }));
+    const merged = [...genRows, ...planRows]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, limit);
+    return c.json({ code: 200, data: merged });
+  } catch (e) {
+    return c.json({ code: 500, msg: e.message }, 500);
+  }
+}
+
 // ===================== hono app =====================
 checkDbConfig();
 
@@ -1047,5 +1085,8 @@ app.post('/api/planner/analyze', authRequired, plannerAnalyzeHandler);
 app.get('/api/planner/status', authRequired, plannerStatusHandler);
 app.get('/api/admin/config', getConfigHandler);
 app.put('/api/admin/config', putConfigHandler);
+
+// CLI 用户级记录（只读，当前登录用户）
+app.get('/api/my/logs', authRequired, myLogsHandler);
 
 export default app;
